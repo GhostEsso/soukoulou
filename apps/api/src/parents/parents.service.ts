@@ -182,7 +182,7 @@ export class ParentsService {
   async resetAccess(schoolId: string, id: string) {
     await this.assertWrite(schoolId);
     const userId = await this.accountOf(schoolId, id);
-    return this.prisma.$transaction((tx) => resetAccess(tx, userId));
+    return this.prisma.$transaction((tx) => resetAccess(tx, userId, schoolId));
   }
 
   async removeAccess(schoolId: string, id: string) {

@@ -8,7 +8,12 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.module';
 import { OnboardingService } from '../schools/onboarding.service';
-import { grantAccess, removeAccess, resetAccess } from '../auth/accounts';
+import {
+  assertLoginCode,
+  grantAccess,
+  removeAccess,
+  resetAccess,
+} from '../auth/accounts';
 import { photoVersion, StorageService } from '../storage/storage.module';
 import type { StudentDto, StudentQuery, UpdateStudentDto } from './dto';
 
@@ -247,6 +252,7 @@ export class StudentsService {
             throw new BadRequestException(
               'Cet élève se connecte avec son matricule : retirez d’abord son accès.',
             );
+          assertLoginCode(dto.matricule);
           await tx.user.update({
             where: { id: student.userId },
             data: { loginCode: dto.matricule.toLowerCase() },
@@ -298,7 +304,9 @@ export class StudentsService {
     const { userId, matricule } = await this.own(schoolId, id);
     if (!userId)
       throw new ConflictException('Cet élève n’a pas encore d’accès.');
-    const r = await this.prisma.$transaction((tx) => resetAccess(tx, userId));
+    const r = await this.prisma.$transaction((tx) =>
+      resetAccess(tx, userId, schoolId),
+    );
     return { phone: matricule, code: r.code };
   }
 

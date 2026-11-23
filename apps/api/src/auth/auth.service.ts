@@ -103,17 +103,16 @@ export class AuthService {
   async login(identifier: string, password: string) {
     const byEmail = identifier.includes('@');
     const phone = byEmail ? null : normalizePhone(identifier);
-    // Sans « @ » : téléphone (parents, enseignants) ou matricule (élèves, en minuscules).
+    // Sans « @ » : téléphone (parents, enseignants) si le format en est un, sinon matricule
+    // (élèves, en minuscules). Un matricule ne peut pas avoir un format de téléphone
+    // (assertLoginCode) : un seul champ est cherché, jamais de compte ambigu.
     const user = byEmail
       ? await this.prisma.user.findUnique({ where: { email: identifier } })
-      : await this.prisma.user.findFirst({
-          where: {
-            OR: [
-              ...(phone ? [{ loginPhone: phone }] : []),
-              { loginCode: identifier.trim().toLowerCase() },
-            ],
-          },
-        });
+      : phone
+        ? await this.prisma.user.findUnique({ where: { loginPhone: phone } })
+        : await this.prisma.user.findUnique({
+            where: { loginCode: identifier.trim().toLowerCase() },
+          });
     const ok = user && (await verify(user.passwordHash, password));
     if (!user || !ok) {
       throw new UnauthorizedException('Identifiant ou mot de passe incorrect.');

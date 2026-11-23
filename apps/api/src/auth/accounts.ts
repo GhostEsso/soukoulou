@@ -1,4 +1,8 @@
-import { BadRequestException, ConflictException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { hash } from '@node-rs/argon2';
 import type { Prisma, Role } from '@prisma/client';
 import { randomBytes } from 'node:crypto';
@@ -42,6 +46,7 @@ export async function grantAccess(
       throw new BadRequestException(
         'Renseignez d’abord le matricule de l’élève : il servira d’identifiant.',
       );
+    assertLoginCode(loginCode);
     if (await tx.user.findUnique({ where: { loginCode } }))
       throw new ConflictException(
         'Ce matricule sert déjà d’identifiant à un autre compte Soukoulou : modifiez-le (préfixe de l’école, par exemple).',
@@ -93,8 +98,36 @@ export async function grantAccess(
   return { userId: u.id, login: phone, code };
 }
 
-/** Nouveau code (mot de passe oublié) ; les sessions en cours sont coupées. */
-export async function resetAccess(tx: Tx, userId: string) {
+/**
+ * Matricule utilisé comme identifiant : jamais un format de téléphone, sinon la connexion
+ * pourrait confondre un élève avec un compte enseignant ou parent.
+ */
+export function assertLoginCode(matricule: string) {
+  if (normalizePhone(matricule))
+    throw new BadRequestException(
+      'Ce matricule ressemble à un numéro de téléphone : ajoutez des lettres (préfixe de l’école, par exemple).',
+    );
+}
+
+/**
+ * Nouveau code (mot de passe oublié) ; les sessions en cours sont coupées.
+ * Refusé si le compte sert aussi dans une autre école : sinon une école pourrait rattacher
+ * le numéro d'une personne d'une autre école, réinitialiser son code et prendre son compte.
+ */
+export async function resetAccess(tx: Tx, userId: string, schoolId: string) {
+  const elsewhere = await tx.user.count({
+    where: {
+      id: userId,
+      OR: [
+        { isPlatformAdmin: true },
+        { memberships: { some: { schoolId: { not: schoolId } } } },
+      ],
+    },
+  });
+  if (elsewhere)
+    throw new ForbiddenException(
+      'Ce compte sert aussi dans une autre école : seule la personne peut changer son mot de passe.',
+    );
   const { code, data } = await fresh();
   const u = await tx.user.update({
     where: { id: userId },
