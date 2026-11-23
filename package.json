@@ -1,0 +1,9 @@
+{
+  "name": "soukoulou",
+  "private": true,
+  "scripts": {
+    "db:up": "docker compose up -d db",
+    "dev:api": "pnpm --filter api start:dev",
+    "test:api": "pnpm --filter api test:e2e"
+  }
+}

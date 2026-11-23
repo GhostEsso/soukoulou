@@ -1,0 +1,28 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: soukoulou
+      POSTGRES_PASSWORD: soukoulou
+      POSTGRES_DB: soukoulou
+    ports:
+      - "5433:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+  # Stockage des fichiers (photos de profil…), compatible S3. Console : http://localhost:9001
+  minio:
+    build: ./docker/minio
+    image: soukoulou-minio:2025-04-22
+    command: server /data --console-address ":9001"
+    environment:
+      # Identifiants de développement local uniquement.
+      MINIO_ROOT_USER: soukoulou
+      MINIO_ROOT_PASSWORD: soukoulou-dev-secret
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+volumes:
+  db-data:
+  minio-data:

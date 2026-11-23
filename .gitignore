@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+.env
+uploads
+*.tsbuildinfo
+.demo-login.txt
+.claude-flow
+.DS_Store
