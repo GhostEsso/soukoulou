@@ -6,11 +6,18 @@ import { FeesController } from './fees.controller';
 import { FeesService } from './fees.service';
 import { OnlineController } from './online.controller';
 import { OnlineService } from './online.service';
+import { PayoutsController } from './payouts.controller';
+import { PayoutsService } from './payouts.service';
 
 @Module({
   imports: [SchoolsModule],
-  controllers: [FeesController, CashboxController, OnlineController],
-  providers: [FeesService, CashboxService, OnlineService],
+  controllers: [
+    FeesController,
+    CashboxController,
+    OnlineController,
+    PayoutsController,
+  ],
+  providers: [FeesService, CashboxService, OnlineService, PayoutsService],
   exports: [FeesService, CashboxService],
 })
 export class FeesModule {}

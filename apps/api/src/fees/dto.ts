@@ -1,8 +1,10 @@
-import { Type } from 'class-transformer';
+import { PayoutStatus } from '@prisma/client';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
   IsArray,
+  IsEnum,
   IsIn,
   IsInt,
   IsOptional,
@@ -59,4 +61,36 @@ export class CheckoutDto {
   @Min(1, { message: 'Montant invalide.' })
   @Max(100_000_000, { message: 'Montant invalide.' })
   amount!: number;
+}
+
+const trim = ({ value }: { value: unknown }) =>
+  typeof value === 'string' ? value.trim() : value;
+
+export class PayoutDto {
+  @IsInt({ message: 'Montant invalide.' })
+  @Min(1, { message: 'Montant invalide.' })
+  @Max(100_000_000, { message: 'Montant invalide.' })
+  amount!: number;
+  @Transform(trim)
+  @IsString({ message: 'Destination obligatoire.' })
+  @Length(3, 100, { message: 'Destination obligatoire.' })
+  destination!: string;
+}
+
+export class ListPayoutsQuery {
+  @IsOptional() @IsEnum(PayoutStatus) status?: PayoutStatus;
+}
+
+export class PaidDto {
+  @Transform(trim)
+  @IsString()
+  @Length(1, 100, { message: 'Référence obligatoire (100 caractères max).' })
+  providerRef!: string;
+}
+
+export class RejectDto {
+  @Transform(trim)
+  @IsString()
+  @Length(1, 500, { message: 'Motif obligatoire (500 caractères max).' })
+  reason!: string;
 }

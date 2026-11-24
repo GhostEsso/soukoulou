@@ -14,6 +14,18 @@ export type BalanceQuery = {
   status?: 'unpaid' | 'overdue' | 'paid';
 };
 
+/** Encaissé en ligne (hors espèces) ; accepte un client de transaction. */
+export async function onlineCollected(
+  db: Pick<PrismaService, 'feePayment'>,
+  schoolId: string,
+) {
+  const r = await db.feePayment.aggregate({
+    where: { schoolId, status: 'PAID', method: { not: 'CASH' } },
+    _sum: { amount: true },
+  });
+  return r._sum.amount ?? 0;
+}
+
 export const fmt = (n: number) => n.toLocaleString('fr-FR').replace(/\s/g, ' ');
 
 /** Attribue le numéro de reçu (compteur de l'école, jamais remis à zéro) ; à appeler dans la transaction du passage à PAID. */
@@ -254,16 +266,13 @@ export class CashboxService {
       overdue: sum('overdueAmount', r),
     }));
     const [online, payouts] = await Promise.all([
-      this.prisma.feePayment.aggregate({
-        where: { schoolId, status: 'PAID', method: { not: 'CASH' } },
-        _sum: { amount: true },
-      }),
+      onlineCollected(this.prisma, schoolId),
       this.prisma.payout.findMany({
         where: { schoolId },
         select: { amount: true, status: true },
       }),
     ]);
-    const collected = online._sum.amount ?? 0;
+    const collected = online;
     return {
       due: sum('due'),
       collected: sum('paid'),
