@@ -99,7 +99,17 @@ export function FeesPanel({
                 <span>
                   {dayLabel(p.paidAt)} · {FEE_METHODS[p.method]}
                 </span>
-                <span className="font-medium text-foreground tabular-nums">{money(p.amount)}</span>
+                <span className="flex items-center gap-3">
+                  <span className="font-medium text-foreground tabular-nums">{money(p.amount)}</span>
+                  <a
+                    href={`/impression/${encodeURIComponent(schoolId)}/recu/${encodeURIComponent(p.id)}?enfant=${encodeURIComponent(studentId)}`}
+                    target="_blank"
+                    rel="noopener"
+                    className="text-primary hover:underline"
+                  >
+                    Reçu
+                  </a>
+                </span>
               </li>
             ))}
           </ul>

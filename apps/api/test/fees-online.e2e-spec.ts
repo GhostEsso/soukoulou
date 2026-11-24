@@ -237,6 +237,36 @@ describe('Frais de scolarité : paiement en ligne des parents (e2e)', () => {
       where: { id: schoolId },
     });
     expect(school.receiptSeq).toBe(1);
+
+    // reçu côté parent : payeur, reste après paiement ; refusé pour l'enfant d'une autre famille
+    const id = res.body.paymentId as string;
+    const rec = await http
+      .get(
+        `/schools/${schoolId}/parent/children/${f.studentId}/fees/receipts/${id}`,
+      )
+      .set(f.auth)
+      .expect(200);
+    expect(rec.body).toMatchObject({
+      number: receipt,
+      amount: 10_000,
+      payer: 'ParentKofi TEST',
+      payerRole: 'parent',
+      due: 40_000,
+      remaining: 30_000,
+    });
+    const other = await family('Ama');
+    await http
+      .get(
+        `/schools/${schoolId}/parent/children/${f.studentId}/fees/receipts/${id}`,
+      )
+      .set(other.auth)
+      .expect(404);
+    await http
+      .get(
+        `/schools/${schoolId}/parent/children/${other.studentId}/fees/receipts/${id}`,
+      )
+      .set(other.auth)
+      .expect(404);
   });
 
   it('canPay vrai hors production ; en production sans prestataire : canPay faux et checkout 503', async () => {

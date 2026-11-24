@@ -1,16 +1,26 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
-import { dayLabel, FEE_METHODS, money } from "@/lib/format";
+import { FEE_METHODS, money } from "@/lib/format";
 import type { FeeReceipt } from "@/lib/types";
 import { PrintButton } from "../../bulletins/print-button";
 
 export const metadata: Metadata = { title: "Reçu" };
 
-/** Reçu de paiement des frais de scolarité, un par page A5 paysage ; hors du menu de l'école. */
-export default async function PrintReceipt({ params }: PageProps<"/impression/[schoolId]/recu/[paymentId]">) {
+/**
+ * Reçu de paiement des frais de scolarité, une page A5 paysage, à imprimer ou enregistrer en PDF.
+ * `?enfant=<id>` : ouvert depuis l'espace parent (l'API vérifie que l'enfant est le sien).
+ */
+export default async function PrintReceipt({ params, searchParams }: PageProps<"/impression/[schoolId]/recu/[paymentId]">) {
   const { schoolId, paymentId } = await params;
-  const r = await api<FeeReceipt>(`/schools/${encodeURIComponent(schoolId)}/fees/payments/${encodeURIComponent(paymentId)}/receipt`).catch((e) => {
+  const child = (await searchParams).enfant;
+  const s = encodeURIComponent(schoolId);
+  const p = encodeURIComponent(paymentId);
+  const url =
+    typeof child === "string"
+      ? `/schools/${s}/parent/children/${encodeURIComponent(child)}/fees/receipts/${p}`
+      : `/schools/${s}/fees/payments/${p}/receipt`;
+  const r = await api<FeeReceipt>(url).catch((e) => {
     if (e instanceof ApiError && (e.status === 404 || e.status === 403)) notFound();
     throw e;
   });
@@ -31,8 +41,12 @@ export default async function PrintReceipt({ params }: PageProps<"/impression/[s
           </div>
         </header>
         <dl className="my-4 grid grid-cols-[10rem_1fr] gap-y-1.5">
-          <dt className="text-neutral-600">Date</dt>
-          <dd>{dayLabel(r.paidAt)}</dd>
+          <dt className="text-neutral-600">Date et heure</dt>
+          <dd>
+            {new Intl.DateTimeFormat("fr-FR", { dateStyle: "long", timeStyle: "short", timeZone: "Africa/Lome" }).format(new Date(r.paidAt))}
+          </dd>
+          <dt className="text-neutral-600">{r.payerRole === "cashier" ? "Encaissé par" : "Payé par"}</dt>
+          <dd>{r.payer ?? "—"}</dd>
           <dt className="text-neutral-600">Élève</dt>
           <dd className="font-semibold">{r.student.name}</dd>
           <dt className="text-neutral-600">Classe</dt>
@@ -48,7 +62,7 @@ export default async function PrintReceipt({ params }: PageProps<"/impression/[s
             <p className="text-xl font-bold tabular-nums">{money(r.amount)}</p>
           </div>
           <div className="rounded border border-neutral-400 p-3">
-            <p className="text-[10px] uppercase">Reste à payer</p>
+            <p className="text-[10px] uppercase">Reste à payer après ce paiement (sur {money(r.due)})</p>
             <p className="text-xl font-semibold tabular-nums">{money(r.remaining)}</p>
           </div>
         </div>

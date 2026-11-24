@@ -118,4 +118,18 @@ export class ParentSpaceController {
       fees: fees && { ...fees, canPay },
     };
   }
+
+  /** Reçu d'un paiement des frais d'un de ses enfants (à imprimer ou enregistrer en PDF). */
+  @Get('children/:studentId/fees/receipts/:paymentId')
+  async receipt(
+    @CurrentUser() u: AuthUser,
+    @Param('schoolId') s: string,
+    @Param('studentId') studentId: string,
+    @Param('paymentId') paymentId: string,
+  ) {
+    const home = await this.home(u, s);
+    if (!home.children.some((c) => c.id === studentId))
+      throw new NotFoundException();
+    return this.cashbox.receipt(s, paymentId, studentId);
+  }
 }
