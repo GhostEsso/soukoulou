@@ -161,3 +161,12 @@ export async function createCalendar(_: ActionState, form: FormData): Promise<Ac
 export async function deleteCalendar(calendarId: string, _: ActionState): Promise<ActionState> {
   return run(() => api(`/platform/calendars/${id(calendarId)}`, { method: "DELETE" }), "Année scolaire supprimée.");
 }
+
+// ── Décaissements ──────────────────────────────────────
+export async function markPayoutPaid(payoutId: string, _: ActionState, form: FormData): Promise<ActionState> {
+  return run(() => post(`/platform/payouts/${id(payoutId)}/paid`, { providerRef: str(form, "providerRef") }), "Décaissement marqué comme versé.", form);
+}
+
+export async function rejectPayout(payoutId: string, _: ActionState, form: FormData): Promise<ActionState> {
+  return run(() => post(`/platform/payouts/${id(payoutId)}/reject`, { reason: str(form, "reason") }), "Demande rejetée.", form);
+}

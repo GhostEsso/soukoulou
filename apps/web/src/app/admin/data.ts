@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { api } from "@/lib/api";
-import type { Alert, Payment, SubscriptionStatus, VerificationStatus } from "@/lib/types";
+import type { Alert, Payment, Payout, SubscriptionStatus, VerificationStatus } from "@/lib/types";
 
 export interface VerificationRow {
   id: string;
@@ -41,3 +41,4 @@ export const getVerifications = cache((status: VerificationStatus) =>
   api<VerificationRow[]>(`/platform/verifications?status=${status}`),
 );
 export const getPendingTransfers = cache(() => api<PendingTransfer[]>("/platform/payments/pending-transfers"));
+export const getPendingPayouts = cache(() => api<Payout[]>("/platform/payouts?status=REQUESTED"));

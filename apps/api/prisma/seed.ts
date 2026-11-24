@@ -5,13 +5,13 @@ import { seedDemo } from './seed-demo';
 
 const prisma = new PrismaClient();
 
-const ESSENTIEL = [F.CORE];
+const ESSENTIEL = [F.CORE, F.CASHBOX];
 const STANDARD = [
   ...ESSENTIEL,
   F.HOMEWORK,
   F.MESSAGING,
+  F.FEE_TRACKING,
   F.FEE_PAYMENTS,
-  F.CASHBOX,
 ];
 const PREMIUM = [
   ...STANDARD,

@@ -6,6 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { FeesService } from '../fees/fees.service';
 import { PrismaService } from '../prisma/prisma.module';
 import { OnboardingService } from '../schools/onboarding.service';
 import {
@@ -28,6 +29,7 @@ export class StudentsService {
     private readonly prisma: PrismaService,
     private readonly onboarding: OnboardingService,
     private readonly storage: StorageService,
+    private readonly fees: FeesService,
   ) {}
 
   private async assertWrite(schoolId: string) {
@@ -207,7 +209,7 @@ export class StudentsService {
     await this.assertWrite(schoolId);
     const c = await this.classroomFor(schoolId, dto.classroomId);
     try {
-      return await this.prisma.student.create({
+      const student = await this.prisma.student.create({
         data: {
           schoolId,
           firstName: dto.firstName,
@@ -218,6 +220,9 @@ export class StudentsService {
           enrollments: { create: { yearId: c.yearId, classroomId: c.id } },
         },
       });
+      // Fige son dû d'après la grille en vigueur (ne touche jamais un dû existant).
+      await this.fees.applySchedules(schoolId, c.yearId);
+      return student;
     } catch (e) {
       throw unique(e);
     }
@@ -266,6 +271,8 @@ export class StudentsService {
           });
         }
       });
+      // Changement de classe : ne recalcule rien ; crée seulement un dû manquant.
+      if (c) await this.fees.applySchedules(schoolId, c.yearId);
     } catch (e) {
       throw unique(e);
     }
@@ -276,6 +283,15 @@ export class StudentsService {
     const { userId, photoKey } = await this.own(schoolId, id);
     // ponytail: suppression définitive ; à remplacer par un archivage quand notes et paiements existeront.
     await this.prisma.$transaction(async (tx) => {
+      // Verrou des dus avant de compter : un encaissement concurrent est vu, ou attend la suppression.
+      await tx.$queryRaw`SELECT id FROM "StudentFee" WHERE "studentId" = ${id} FOR UPDATE`;
+      const paid = await tx.feePayment.count({
+        where: { studentFee: { studentId: id }, status: { not: 'FAILED' } },
+      });
+      if (paid)
+        throw new ConflictException(
+          'Cet élève a des paiements enregistrés : il ne peut pas être supprimé.',
+        );
       await tx.student.delete({ where: { id } });
       if (userId) await removeAccess(tx, userId, schoolId);
     });

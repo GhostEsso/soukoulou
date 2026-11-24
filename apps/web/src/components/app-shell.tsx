@@ -26,6 +26,10 @@ import {
   ShieldCheck,
   Sparkles,
   Tags,
+  Wallet,
+  Table2,
+  ChartColumn,
+  Landmark,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
@@ -91,6 +95,10 @@ const ICONS = {
   reports: FileText,
   parents: Users,
   announcements: Megaphone,
+  fees: Wallet,
+  feeGrid: Table2,
+  feeStats: ChartColumn,
+  payouts: Landmark,
 } satisfies Record<string, LucideIcon>;
 
 export type NavIcon = keyof typeof ICONS;

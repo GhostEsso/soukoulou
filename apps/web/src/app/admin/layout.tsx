@@ -6,7 +6,7 @@ import { logout } from "../(auth)/actions";
 import type { Notice } from "@/components/header-tools";
 import { ago, todayLabel } from "@/lib/format";
 import type { Alert } from "@/lib/types";
-import { getAlerts, getPendingTransfers, getVerifications } from "./data";
+import { getAlerts, getPendingPayouts, getPendingTransfers, getVerifications } from "./data";
 
 const ALERT_TITLE: Record<Alert["type"], string> = {
   NEW_VERIFICATION: "Dossier à vérifier",
@@ -20,10 +20,11 @@ export const metadata: Metadata = { title: { template: "%s · Console Soukoulou"
 export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
   const me = await getMe();
   if (!me.isPlatformAdmin) notFound();
-  const [pending, transfers, alerts] = await Promise.all([
+  const [pending, transfers, alerts, payouts] = await Promise.all([
     getVerifications("PENDING"),
     getPendingTransfers(),
     getAlerts(false),
+    getPendingPayouts(),
   ]);
   const notices: Notice[] = alerts.items.slice(0, 15).map((a) => ({
     id: a.id,
@@ -41,6 +42,7 @@ export default async function AdminLayout({ children }: LayoutProps<"/admin">) {
         { href: "/admin", label: "Tableau de bord", icon: "home", exact: true },
         { href: "/admin/verifications", label: "Vérifications", icon: "verifications", badge: n(pending.length) },
         { href: "/admin/paiements", label: "Virements à confirmer", icon: "payments", badge: n(transfers.length) },
+        { href: "/admin/decaissements", label: "Décaissements", icon: "payouts", badge: n(payouts.length) },
         { href: "/admin/ecoles", label: "Écoles", icon: "schools" },
       ],
     },

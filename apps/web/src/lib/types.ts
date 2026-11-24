@@ -12,7 +12,7 @@ export type SchoolType = "PRIMARY" | "MIDDLE" | "HIGH" | "COMPLEX" | "INSTITUTE"
 export type Ownership = "PUBLIC" | "PRIVATE_SECULAR" | "PRIVATE_FAITH";
 export type BillingCycle = "MONTHLY" | "SCHOOL_YEAR";
 export type PaymentMethod = "MOBILE_MONEY" | "CARD" | "TRANSFER";
-export type Need = "read" | "write" | "publish" | "invite" | "collect";
+export type Need = "read" | "write" | "publish" | "invite" | "collect" | "payout";
 export type Denial =
   | "DISCOVERY"
   | "SUSPENDED"
@@ -505,6 +505,8 @@ export interface ChildFollowUp {
   attendance: StudentAttendance;
   slots: Slot[];
   discipline: DisciplineRecord[];
+  /** Frais de scolarité (espace parent) : null sans grille applicable. */
+  fees?: ChildFees | null;
 }
 
 export type DisciplineKind = "MERIT" | "PUNISHMENT" | "BLAME";
@@ -542,4 +544,86 @@ export interface MyExam {
   subject: string;
   period: string;
   score: number | null;
+}
+
+// ── Frais de scolarité ───────────────────────────────────
+
+export interface FeeSchedule {
+  id: string;
+  label: string | null;
+  sex: Sex | null;
+  levels: { id: string; name: string }[];
+  /** « AAAA-MM-JJ ». */
+  lines: { position: number; amount: number; dueOn: string }[];
+}
+
+export interface FeeBalance {
+  studentId: string;
+  name: string;
+  classroom: string | null;
+  due: number;
+  paid: number;
+  remaining: number;
+  overdue: boolean;
+}
+
+export interface FeeLine {
+  position: number;
+  amount: number;
+  paid: number;
+  remaining: number;
+  dueOn: string;
+  overdue: boolean;
+}
+
+export type FeeMethod = "CASH" | "MOBILE_MONEY" | "CARD";
+
+export interface FeePaymentRow {
+  id: string;
+  amount: number;
+  method: FeeMethod;
+  receiptNumber: string | null;
+  paidAt: string;
+}
+
+export interface ChildFees {
+  label: string;
+  /** Espace parent : paiement en ligne ouvert (offre de l'école et prestataire configuré). */
+  canPay?: boolean;
+  lines: FeeLine[];
+  payments: FeePaymentRow[];
+}
+
+export interface FeeDashboard {
+  due: number;
+  collected: number;
+  remaining: number;
+  overdue: number;
+  byClassroom: { classroomId: string | null; classroom: string | null; due: number; collected: number; remaining: number; overdue: number }[];
+  online: { collected: number; available: number };
+}
+
+export interface FeeReceipt {
+  number: string | null;
+  school: { name: string };
+  student: { name: string };
+  classroom: string | null;
+  amount: number;
+  method: FeeMethod;
+  paidAt: string;
+  remaining: number;
+}
+
+export type PayoutStatus = "REQUESTED" | "PAID" | "REJECTED";
+
+export interface Payout {
+  id: string;
+  amount: number;
+  destination: string;
+  status: PayoutStatus;
+  providerRef: string | null;
+  rejectReason: string | null;
+  createdAt: string;
+  processedAt: string | null;
+  school?: { name: string };
 }

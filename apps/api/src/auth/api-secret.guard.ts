@@ -8,6 +8,9 @@ import { ThrottlerGuard } from '@nestjs/throttler';
 import type { Request } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 
+/** Routes appelées par le prestataire de paiement : il ne peut pas porter le secret, elles vérifient leur signature HMAC. */
+const WEBHOOK_PATHS = ['/webhooks/payments', '/webhooks/fee-payments'];
+
 /** En-tête porté par le serveur web (et la tâche planifiée) quand l'API est publique. */
 export const API_SECRET_HEADER = 'x-api-secret';
 
@@ -24,14 +27,20 @@ export function hasApiSecret(req: Request) {
 /**
  * API publique (hébergement séparé du web) : seul le serveur web, qui connaît API_SECRET,
  * peut l'appeler. Sans API_SECRET (dev, Docker Compose où l'API est interne), rien n'est exigé.
- * /health reste ouvert pour la sonde de l'hébergeur.
+ * /health reste ouvert pour la sonde de l'hébergeur ; les deux webhooks aussi : le prestataire de paiement
+ * ne peut pas porter le secret, ces routes vérifient leur propre signature HMAC.
  */
 @Injectable()
 export class ApiSecretGuard implements CanActivate {
   canActivate(ctx: ExecutionContext) {
     if (!process.env.API_SECRET) return true;
     const req = ctx.switchToHttp().getRequest<Request>();
-    if (req.path === '/health' || hasApiSecret(req)) return true;
+    if (
+      req.path === '/health' ||
+      WEBHOOK_PATHS.includes(req.path) ||
+      hasApiSecret(req)
+    )
+      return true;
     throw new ForbiddenException();
   }
 }

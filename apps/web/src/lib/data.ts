@@ -45,3 +45,9 @@ export function brandColorOf(o: Onboarding): string | null {
   const allowed = o.school.plan?.features.includes("custom_theme");
   return allowed && o.school.brandColor && HEX.test(o.school.brandColor) ? o.school.brandColor : null;
 }
+
+/** L'offre de l'école inclut-elle cette fonctionnalité ? */
+export const hasFeature = (o: Onboarding, feature: string) => Boolean(o.school.plan?.features.includes(feature));
+
+/** Année de référence des frais : la courante, sinon la plus récente (comme la caisse côté API). */
+export const feeYear = (s: Structure) => s.years.find((y) => y.isCurrent) ?? [...s.years].sort((a, b) => b.startsOn.localeCompare(a.startsOn))[0];

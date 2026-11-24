@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
+import { sendFeeReminders } from '../fees/reminders';
 import { MailService } from '../mail/mail.module';
 import { PrismaService } from '../prisma/prisma.module';
 
@@ -34,6 +35,7 @@ export class LifecycleService {
     await this.expireSubscriptions(now);
     await this.endVacations(now);
     await this.remind(now);
+    await sendFeeReminders(this.prisma, this.mail, now);
   }
 
   /** Mode découverte terminé sans upgrade : l'école et ses comptes sans autre école sont supprimés. */
