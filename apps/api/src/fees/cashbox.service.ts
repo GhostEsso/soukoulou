@@ -282,7 +282,7 @@ export class CashboxService {
     };
   }
 
-  async dashboard(schoolId: string, yearId?: string) {
+  async dashboard(schoolId: string, yearId?: string, q?: string) {
     const y = await this.yearId(schoolId, yearId);
     const rows = y ? await this.rows(schoolId, y, undefined) : [];
     const sum = (k: 'due' | 'paid' | 'overdueAmount', r = rows) =>
@@ -309,7 +309,7 @@ export class CashboxService {
     ]);
     const collected = online;
     return {
-      recent: y ? await this.recentPayments(schoolId, y, rows) : [],
+      recent: y ? await this.recentPayments(schoolId, y, rows, q) : [],
       due: sum('due'),
       collected: sum('paid'),
       remaining: sum('due') - sum('paid'),
@@ -319,7 +319,10 @@ export class CashboxService {
     };
   }
 
-  /** 20 derniers paiements de l'année : payeur, élève, classe, reste à payer juste après ce paiement. */
+  /**
+   * Derniers paiements de l'année : payeur, élève, classe, reste à payer juste après ce paiement.
+   * `q` filtre sur le nom de l'élève ou d'un de ses parents (chaque mot doit correspondre).
+   */
   private async recentPayments(
     schoolId: string,
     yearId: string,
@@ -329,11 +332,26 @@ export class CashboxService {
       classroom: string | null;
       due: number;
     }[],
+    q?: string,
   ) {
+    const words = (q ?? '').trim().split(/\s+/).filter(Boolean).slice(0, 5);
+    const like = (w: string) => ({
+      OR: [
+        { firstName: { contains: w, mode: 'insensitive' as const } },
+        { lastName: { contains: w, mode: 'insensitive' as const } },
+      ],
+    });
+    const student = words.length
+      ? {
+          AND: words.map((w) => ({
+            OR: [like(w), { parents: { some: { parent: like(w) } } }],
+          })),
+        }
+      : undefined;
     const recent = await this.prisma.feePayment.findMany({
-      where: { schoolId, status: 'PAID', studentFee: { yearId } },
+      where: { schoolId, status: 'PAID', studentFee: { yearId, student } },
       orderBy: [{ paidAt: 'desc' }, { id: 'desc' }],
-      take: 20,
+      take: words.length ? 100 : 20,
       select: {
         id: true,
         amount: true,
