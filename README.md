@@ -3,6 +3,7 @@
 <div align="center">
   <h3><b>Soukoulou</b></h3>
   <p>SaaS de gestion scolaire multi-écoles pour l'Afrique de l'Ouest</p>
+  <p><a href="https://soukoulou-chi.vercel.app"><b>🌐 Voir le site en ligne</b></a></p>
 </div>
 
 ---
