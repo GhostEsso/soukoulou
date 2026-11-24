@@ -14,7 +14,7 @@ export type BalanceQuery = {
   status?: 'unpaid' | 'overdue' | 'paid';
 };
 
-const fmt = (n: number) => n.toLocaleString('fr-FR').replace(/\s/g, ' ');
+export const fmt = (n: number) => n.toLocaleString('fr-FR').replace(/\s/g, ' ');
 
 /** Attribue le numéro de reçu (compteur de l'école, jamais remis à zéro) ; à appeler dans la transaction du passage à PAID. */
 export async function assignReceipt(

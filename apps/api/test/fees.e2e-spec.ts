@@ -5,6 +5,8 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.module';
+import { MailService } from '../src/mail/mail.module';
+import { LifecycleService } from '../src/schools/lifecycle.service';
 import { configureApp } from '../src/setup';
 
 const RUN = Date.now().toString(36); // la base de test n'est jamais vidée : données uniques par exécution
@@ -376,6 +378,110 @@ describe('Frais de scolarité : grille et montants figés (e2e)', () => {
         .get(`/schools/${o.school.id}/fees/payments/${paymentId}/receipt`)
         .set({ Authorization: `Bearer ${o.token}` })
         .expect(404);
+    });
+  });
+  describe('relances', () => {
+    const NOW = new Date('2026-10-01T08:00:00Z');
+    const parentEmail = `parent-rel-${RUN}@famille.tg`;
+    let rId: string;
+    let rToken: string;
+    let rYear: string;
+    let rClass: string;
+
+    const sent = () =>
+      app
+        .get(MailService)
+        .outbox.filter((m) => m.to === parentEmail)
+        .map((m) => m.subject);
+
+    // Élève avec parent (email unique à l'exécution), une tranche de 30 000 échue à `dueOn`.
+    async function studentDue(name: string, dueOn: string, paid = 0) {
+      await http
+        .post(`/schools/${rId}/fees/schedules`)
+        .set({ Authorization: `Bearer ${rToken}` })
+        .send({
+          yearId: rYear,
+          sex: null,
+          levelIds: [
+            (
+              await prisma.classroom.findUniqueOrThrow({
+                where: { id: rClass },
+              })
+            ).levelId,
+          ],
+          lines: [{ amount: 30_000, dueOn }],
+        })
+        .expect(201);
+      const st = await http
+        .post(`/schools/${rId}/students`)
+        .set({ Authorization: `Bearer ${rToken}` })
+        .send({
+          firstName: name,
+          lastName: 'Rel',
+          sex: 'MALE',
+          classroomId: rClass,
+        })
+        .expect(201);
+      const parent = await prisma.parent.create({
+        data: {
+          schoolId: rId,
+          firstName: 'Kofi',
+          lastName: 'Rel',
+          phone: `+228${Math.floor(Math.random() * 1e8)}`,
+          email: parentEmail,
+          children: { create: { studentId: st.body.id, relation: 'FATHER' } },
+        },
+      });
+      expect(parent.id).toBeTruthy();
+      if (paid) {
+        const fee = await prisma.studentFee.findFirstOrThrow({
+          where: { studentId: st.body.id },
+        });
+        await prisma.feePayment.create({
+          data: {
+            schoolId: rId,
+            studentFeeId: fee.id,
+            amount: paid,
+            method: 'CASH',
+            status: 'PAID',
+            paidAt: NOW,
+          },
+        });
+      }
+    }
+
+    beforeAll(async () => {
+      const r = await makeSchool('rel', 'STANDARD');
+      rId = r.school.id;
+      rToken = r.token;
+      rYear = r.year.id;
+      const l = await prisma.level.create({
+        data: { schoolId: rId, name: '6e', position: 0 },
+      });
+      rClass = (
+        await prisma.classroom.create({
+          data: { schoolId: rId, yearId: rYear, levelId: l.id, name: '6e A' },
+        })
+      ).id;
+    });
+
+    it('6 jours avant l’échéance : 1 email ; même jour relancé : aucun de plus', async () => {
+      await studentDue('Pre', '2026-10-07');
+      const lifecycle = app.get(LifecycleService);
+      await lifecycle.runDaily(NOW);
+      expect(sent()).toEqual([
+        'Frais de scolarité : tranche n°1 à régler avant le 07/10/2026',
+      ]);
+      await lifecycle.runDaily(NOW);
+      expect(sent()).toHaveLength(1);
+    });
+
+    it('tranche soldée : aucun email', async () => {
+      const before = sent().length;
+      await prisma.feeSchedule.deleteMany({ where: { schoolId: rId } });
+      await studentDue('Solde', '2026-10-05', 30_000);
+      await app.get(LifecycleService).runDaily(NOW);
+      expect(sent()).toHaveLength(before);
     });
   });
 });
