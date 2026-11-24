@@ -601,6 +601,18 @@ export interface FeeDashboard {
   overdue: number;
   byClassroom: { classroomId: string | null; classroom: string | null; due: number; collected: number; remaining: number; overdue: number }[];
   online: { collected: number; available: number };
+  recent: {
+    id: string;
+    paidAt: string | null;
+    amount: number;
+    method: FeeMethod;
+    receiptNumber: string | null;
+    studentId: string;
+    student: string | null;
+    classroom: string | null;
+    payer: string | null;
+    remainingAfter: number;
+  }[];
 }
 
 export interface FeeReceipt {

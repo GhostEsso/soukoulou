@@ -6,6 +6,7 @@ import { money } from "@/lib/format";
 import type { FeeDashboard } from "@/lib/types";
 import { Panel } from "../../../dashboard";
 import { PlanDenied } from "../plan-denied";
+import { RecentPayments } from "./recent-payments";
 
 export const metadata: Metadata = { title: "Frais : tableau de bord" };
 
@@ -38,6 +39,7 @@ export default async function FeeDashboardPage({ params }: PageProps<"/ecole/[sc
           </li>
         ))}
       </ul>
+      <RecentPayments schoolId={schoolId} items={d.recent} />
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <Panel title="Par classe">
           <div className="overflow-x-auto">

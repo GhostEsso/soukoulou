@@ -451,6 +451,20 @@ describe('Frais de scolarité : grille et montants figés (e2e)', () => {
       expect(b.remaining).toBe(b.due - b.collected);
       expect(res.body.online).toEqual({ collected: 0, available: 0 });
       expect(Array.isArray(res.body.byClassroom)).toBe(true);
+      // derniers paiements : élève, classe, payeur (caissier), reste juste après le paiement
+      const mine = (
+        res.body.recent as { id: string; [k: string]: unknown }[]
+      ).find((r) => r.id === paymentId);
+      expect(mine).toMatchObject({
+        amount: 25_000,
+        method: 'CASH',
+        receiptNumber: `REC-${YEAR}-000001`,
+        studentId,
+        student: 'Caisse TEST',
+        classroom: '5e A',
+        remainingAfter: 15_000,
+      });
+      expect(typeof mine?.payer).toBe('string');
     });
 
     it('tableau de bord en Essentiel : 403 PLAN', async () => {
