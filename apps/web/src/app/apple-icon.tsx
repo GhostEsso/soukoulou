@@ -1,4 +1,5 @@
 import { ImageResponse } from "next/og";
+import { BRAND_BLUE, LogoMark } from "@/components/logo-mark";
 
 // Icône écran d'accueil iOS (iOS arrondit lui-même les coins).
 export const size = { width: 180, height: 180 };
@@ -14,13 +15,10 @@ export default function AppleIcon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#2346c8",
-          color: "#ffffff",
-          fontSize: 100,
-          fontWeight: 700,
+          background: BRAND_BLUE,
         }}
       >
-        S
+        <LogoMark size={140} background="none" />
       </div>
     ),
     size,
