@@ -1,6 +1,7 @@
 import { hash } from '@node-rs/argon2';
 import type { PrismaClient } from '@prisma/client';
 import { splitYear } from '../src/structure/rules';
+import { seedFees } from './seed-demo-fees';
 
 /**
  * École de démonstration (développement uniquement) : un complexe scolaire togolais
@@ -226,6 +227,7 @@ export async function seedDemo(
   await seedSchedule(prisma, schoolId, year.id);
   await seedGrades(prisma, schoolId, year.id);
   await seedParents(prisma, schoolId);
+  await seedFees(prisma, schoolId, year.id, user.id);
 
   console.log(`École de démo prête : ${school.name} (${email}).`);
 }

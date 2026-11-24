@@ -795,6 +795,7 @@ model Payout {
   processedAt   DateTime?
 
   @@index([status])
+  @@index([schoolId, createdAt])
 }
 
 /// Une relance envoyée : empêche les doublons.
