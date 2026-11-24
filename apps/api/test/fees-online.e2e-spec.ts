@@ -10,6 +10,8 @@ import { configureApp } from '../src/setup';
 
 const RUN = Date.now().toString(36);
 const PASSWORD = 'motdepasse-solide';
+const SESS = `sess_${RUN}`;
+const TX = `tx_${RUN}`;
 
 describe('Frais de scolarité : paiement en ligne des parents (e2e)', () => {
   let app: INestApplication<App>;
@@ -168,6 +170,14 @@ describe('Frais de scolarité : paiement en ligne des parents (e2e)', () => {
     };
   };
 
+  // Tests indépendants du .env local : sans clé SasPay (simulation), sauf le test SasPay qui pose la sienne.
+  const saspayEnv = [
+    'SASPAY_API_KEY',
+    'SASPAY_API_URL',
+    'SASPAY_WEBHOOK_SECRET',
+  ];
+  const savedEnv = saspayEnv.map((k) => [k, process.env[k]] as const);
+
   beforeAll(async () => {
     const mod = await Test.createTestingModule({
       imports: [AppModule],
@@ -177,9 +187,14 @@ describe('Frais de scolarité : paiement en ligne des parents (e2e)', () => {
     await app.init();
     http = request(app.getHttpServer());
     prisma = app.get(PrismaService);
+    // après init : ConfigModule charge le .env pendant la compilation du module
+    for (const k of saspayEnv) delete process.env[k];
   });
 
-  afterAll(() => app.close());
+  afterAll(async () => {
+    await app.close();
+    for (const [k, v] of savedEnv) if (v !== undefined) process.env[k] = v;
+  });
 
   it('checkout 10 000 : PENDING sans effet sur le solde ; webhook PAID : reste 30 000, reçu ; rejeu : inchangé', async () => {
     const { schoolId, family } = await setup('std', 'STANDARD');
@@ -288,15 +303,15 @@ describe('Frais de scolarité : paiement en ligne des parents (e2e)', () => {
           return Promise.resolve(
             json(
               {
-                id: 'sess_1',
+                id: SESS,
                 checkout_url: 'https://sandbox-checkout.saspay.me/c/x',
               },
               201,
             ),
           );
-        if (url.endsWith('/checkout-sessions/sess_1/status/'))
+        if (url.endsWith(`/checkout-sessions/${SESS}/status/`))
           return Promise.resolve(json(session));
-        if (url.endsWith('/payments/tx_1/verify/'))
+        if (url.endsWith(`/payments/${TX}/verify/`))
           return Promise.resolve(json(verified));
         return Promise.resolve(json({}, 404));
       },
@@ -329,14 +344,14 @@ describe('Frais de scolarité : paiement en ligne des parents (e2e)', () => {
 
       // pas encore payé, puis montant net incohérent : reste en attente
       expect((await refresh(id)).body.status).toBe('PENDING');
-      session = { status: 'PAID', transaction_id: 'tx_1' };
+      session = { status: 'PAID', transaction_id: TX };
       expect((await refresh(id)).body.status).toBe('PENDING');
 
       // webhook : signature fausse ou trop vieille refusée ; valide déclenche la vérification
       verified = { ...verified, net_amount: '10000.00' };
       const body = JSON.stringify({
         event: 'transaction.success',
-        data: { id: 'tx_1' },
+        data: { id: TX },
       });
       const ts = String(Math.floor(Date.now() / 1000));
       const sig = (t: string) =>

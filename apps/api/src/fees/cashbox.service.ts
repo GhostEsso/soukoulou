@@ -276,6 +276,7 @@ export class CashboxService {
     ]);
     const collected = online;
     return {
+      recent: y ? await this.recentPayments(schoolId, y, rows) : [],
       due: sum('due'),
       collected: sum('paid'),
       remaining: sum('due') - sum('paid'),
@@ -283,5 +284,84 @@ export class CashboxService {
       byClassroom,
       online: { collected, available: availableForPayout(collected, payouts) },
     };
+  }
+
+  /** 20 derniers paiements de l'année : payeur, élève, classe, reste à payer juste après ce paiement. */
+  private async recentPayments(
+    schoolId: string,
+    yearId: string,
+    rows: {
+      studentId: string;
+      name: string;
+      classroom: string | null;
+      due: number;
+    }[],
+  ) {
+    const recent = await this.prisma.feePayment.findMany({
+      where: { schoolId, status: 'PAID', studentFee: { yearId } },
+      orderBy: [{ paidAt: 'desc' }, { id: 'desc' }],
+      take: 20,
+      select: {
+        id: true,
+        amount: true,
+        method: true,
+        paidAt: true,
+        receiptNumber: true,
+        studentFeeId: true,
+        parentId: true,
+        recordedById: true,
+        studentFee: { select: { studentId: true } },
+      },
+    });
+    const feeIds = [...new Set(recent.map((p) => p.studentFeeId))];
+    const [history, parents, cashiers] = await Promise.all([
+      this.prisma.feePayment.findMany({
+        where: { studentFeeId: { in: feeIds }, status: 'PAID' },
+        select: { id: true, studentFeeId: true, amount: true, paidAt: true },
+      }),
+      this.prisma.parent.findMany({
+        where: {
+          schoolId,
+          id: { in: recent.flatMap((p) => (p.parentId ? [p.parentId] : [])) },
+        },
+        select: { id: true, firstName: true, lastName: true },
+      }),
+      this.prisma.user.findMany({
+        where: {
+          id: {
+            in: recent.flatMap((p) => (p.recordedById ? [p.recordedById] : [])),
+          },
+        },
+        select: { id: true, firstName: true, lastName: true },
+      }),
+    ]);
+    const name = (x?: { firstName: string; lastName: string }) =>
+      x ? `${x.firstName} ${x.lastName}` : null;
+    const byStudent = new Map(rows.map((r) => [r.studentId, r]));
+    // Ordre des paiements d'un même dû : date, puis id (départage à la même seconde).
+    const before = (a: { paidAt: Date | null; id: string }, b: typeof a) =>
+      (a.paidAt?.getTime() ?? 0) < (b.paidAt?.getTime() ?? 0) ||
+      ((a.paidAt?.getTime() ?? 0) === (b.paidAt?.getTime() ?? 0) &&
+        a.id <= b.id);
+    return recent.map((p) => {
+      const row = byStudent.get(p.studentFee.studentId);
+      const paidUpTo = history
+        .filter((h) => h.studentFeeId === p.studentFeeId && before(h, p))
+        .reduce((s, h) => s + h.amount, 0);
+      return {
+        id: p.id,
+        paidAt: p.paidAt,
+        amount: p.amount,
+        method: p.method,
+        receiptNumber: p.receiptNumber,
+        studentId: p.studentFee.studentId,
+        student: row?.name ?? null,
+        classroom: row?.classroom ?? null,
+        payer:
+          name(parents.find((x) => x.id === p.parentId)) ??
+          name(cashiers.find((x) => x.id === p.recordedById)),
+        remainingAfter: (row?.due ?? 0) - paidUpTo,
+      };
+    });
   }
 }
