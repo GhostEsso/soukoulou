@@ -21,7 +21,7 @@ export function FollowUp({
   payment,
 }: {
   /** Espace parent : paiement des frais ; absent dans l'espace élève. */
-  payment?: { studentId: string; dev: boolean };
+  payment?: { studentId: string; dev: boolean; returned?: "PENDING" | "PAID" | "FAILED" };
   /** Bloc en plus dans la colonne de droite (annonces dans l'espace élève). */
   aside?: React.ReactNode;
   schoolId: string;
@@ -88,7 +88,7 @@ export function FollowUp({
         <aside className="min-w-0 space-y-6">
           {fees && payment && (
             <Panel title="Frais de scolarité">
-              <FeesPanel schoolId={schoolId} studentId={payment.studentId} fees={fees} dev={payment.dev} />
+              <FeesPanel schoolId={schoolId} studentId={payment.studentId} fees={fees} dev={payment.dev} returned={payment.returned} />
             </Panel>
           )}
           <Panel title="Assiduité">

@@ -9,7 +9,11 @@ import type { Request } from 'express';
 import { timingSafeEqual } from 'node:crypto';
 
 /** Routes appelées par le prestataire de paiement : il ne peut pas porter le secret, elles vérifient leur signature HMAC. */
-const WEBHOOK_PATHS = ['/webhooks/payments', '/webhooks/fee-payments'];
+const WEBHOOK_PATHS = [
+  '/webhooks/payments',
+  '/webhooks/fee-payments',
+  '/webhooks/saspay',
+];
 
 /** En-tête porté par le serveur web (et la tâche planifiée) quand l'API est publique. */
 export const API_SECRET_HEADER = 'x-api-secret';

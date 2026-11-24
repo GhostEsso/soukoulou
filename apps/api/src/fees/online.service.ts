@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ForbiddenException,
   Injectable,
@@ -14,10 +15,11 @@ import { OnboardingService } from '../schools/onboarding.service';
 import type { PaymentWebhookDto } from '../schools/dto';
 import { FEATURES } from '../schools/rules';
 import { assignReceipt, CashboxService, fmt } from './cashbox.service';
+import { saspay, saspayConfigured, saspaySignatureValid } from './saspay';
 
-/** En production, le paiement en ligne n'ouvre qu'avec un prestataire configuré. */
+/** En production, le paiement en ligne n'ouvre qu'avec SasPay configuré ; en dev, simulation sinon. */
 export const onlinePaymentReady = () =>
-  process.env.NODE_ENV !== 'production' || !!process.env.PAYMENT_PROVIDER;
+  process.env.NODE_ENV !== 'production' || saspayConfigured();
 
 /** Paiement en ligne des frais par le parent : ouverture du paiement, puis confirmation du prestataire. */
 @Injectable()
@@ -47,7 +49,13 @@ export class OnlineService {
         userId: parentUserId,
         children: { some: { studentId } },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        email: true,
+      },
     });
     if (!parent) throw new NotFoundException();
     const { access, denial } = await this.onboarding.can(
@@ -67,7 +75,7 @@ export class OnlineService {
       : null;
     if (!fee) throw new NotFoundException('Aucun frais pour cet élève.');
 
-    return this.prisma.$transaction(async (tx) => {
+    const payment = await this.prisma.$transaction(async (tx) => {
       // Même verrou que l'encaissement en caisse : le reste à payer est lu sans concurrence.
       const locked = await tx.$queryRaw<
         { id: string }[]
@@ -91,7 +99,7 @@ export class OnlineService {
         );
       // Un paiement en attente ne compte pas dans le payé : deux ouverts en même temps peuvent
       // chacun être confirmés (voir handleWebhook).
-      const p = await tx.feePayment.create({
+      return tx.feePayment.create({
         data: {
           schoolId,
           studentFeeId: fee.id,
@@ -101,12 +109,148 @@ export class OnlineService {
           parentId: parent.id,
         },
       });
-      await tx.feePayment.update({
-        where: { id: p.id },
-        data: { providerRef: p.id },
+    });
+
+    if (!saspayConfigured()) {
+      // Développement sans clé SasPay : paiement simulé par /webhooks/fee-payments.
+      await this.prisma.feePayment.update({
+        where: { id: payment.id },
+        data: { providerRef: payment.id },
       });
-      // ponytail: pas de prestataire branché, donc pas d'URL de paiement.
-      return { paymentId: p.id, providerRef: p.id, checkoutUrl: null };
+      return {
+        paymentId: payment.id,
+        providerRef: payment.id,
+        checkoutUrl: null,
+      };
+    }
+
+    const web = this.config.getOrThrow<string>('WEB_URL');
+    try {
+      // Checkout hébergé : le parent choisit son réseau (Moov, MTN, carte…) sur la page SasPay.
+      const session = await saspay.createCheckoutSession({
+        amount,
+        // ponytail: adresse de repli si le parent n'a pas d'email (champ exigé par SasPay).
+        customerEmail: parent.email ?? `parent-${parent.id}@soukoulou.tg`,
+        customerName: `${parent.firstName} ${parent.lastName}`,
+        customerPhone: parent.phone,
+        returnUrl: `${web}/parent/${encodeURIComponent(schoolId)}/enfants/${encodeURIComponent(studentId)}?paiement=${payment.id}`,
+        metadata: { feePaymentId: payment.id, schoolId },
+      });
+      await this.prisma.feePayment.update({
+        where: { id: payment.id },
+        data: { provider: 'saspay', providerRef: session.id },
+      });
+      // Le parent est redirigé vers cette URL : uniquement une page SasPay en https.
+      const url = new URL(session.checkout_url);
+      if (url.protocol !== 'https:' || !url.hostname.endsWith('.saspay.me'))
+        throw new BadGatewayException(
+          'Le paiement en ligne est momentanément indisponible.',
+        );
+      return {
+        paymentId: payment.id,
+        providerRef: session.id,
+        checkoutUrl: url.toString(),
+      };
+    } catch (e) {
+      await this.prisma.feePayment.update({
+        where: { id: payment.id },
+        data: { status: 'FAILED' },
+      });
+      throw e;
+    }
+  }
+
+  /**
+   * Confirme un paiement SasPay en attente : session, puis GET /payments/{id}/verify/.
+   * Seul SUCCESS avec le bon montant net en XOF passe le paiement à PAID.
+   */
+  async reconcile(paymentId: string) {
+    const p = await this.prisma.feePayment.findUnique({
+      where: { id: paymentId },
+      select: { status: true, provider: true, providerRef: true, amount: true },
+    });
+    if (
+      !p ||
+      p.status !== 'PENDING' ||
+      p.provider !== 'saspay' ||
+      !p.providerRef
+    )
+      return;
+    const session = await saspay.sessionStatus(p.providerRef);
+    if (session.status === 'EXPIRED' || session.status === 'CANCELLED')
+      return this.fail(paymentId);
+    if (!session.transaction_id) return; // le parent n'a pas encore payé
+    const tx = await saspay.verifyPayment(session.transaction_id);
+    if (tx.status === 'FAILED') return this.fail(paymentId);
+    if (tx.status !== 'SUCCESS') return;
+    if (tx.currency !== 'XOF' || Number(tx.net_amount) !== p.amount) {
+      this.logger.error(
+        `Paiement ${paymentId} : montant SasPay ${tx.net_amount} ${tx.currency} ≠ ${p.amount} XOF, à vérifier à la main.`,
+      );
+      return;
+    }
+    await this.confirm(paymentId);
+  }
+
+  /** Après un webhook SasPay : revérifie les paiements en attente récents (le webhook ne porte pas notre référence). */
+  async reconcilePending() {
+    const pending = await this.prisma.feePayment.findMany({
+      where: {
+        provider: 'saspay',
+        status: 'PENDING',
+        createdAt: { gte: new Date(Date.now() - 3 * 86_400_000) },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 50, // ponytail: borne sous la limite SasPay de 300 req/min
+      select: { id: true },
+    });
+    for (const { id } of pending)
+      await this.reconcile(id).catch((e: Error) =>
+        this.logger.error(`Vérification ${id} : ${e.message}`),
+      );
+  }
+
+  /** Retour du parent depuis la page SasPay : on vérifie son paiement tout de suite. */
+  async refreshForParent(
+    schoolId: string,
+    parentUserId: string,
+    paymentId: string,
+  ) {
+    const parent = await this.prisma.parent.findFirst({
+      where: { schoolId, userId: parentUserId },
+      select: { id: true },
+    });
+    const p = parent
+      ? await this.prisma.feePayment.findFirst({
+          where: { id: paymentId, schoolId, parentId: parent.id },
+          select: { id: true },
+        })
+      : null;
+    if (!p) throw new NotFoundException();
+    await this.reconcile(p.id);
+    return this.statusOf(p.id);
+  }
+
+  handleSaspayWebhook(
+    rawBody: Buffer | undefined,
+    signature: string | undefined,
+    timestamp: string | undefined,
+  ) {
+    const secret = this.config.getOrThrow<string>('SASPAY_WEBHOOK_SECRET');
+    if (
+      !rawBody ||
+      !saspaySignatureValid(rawBody, signature, timestamp, secret)
+    )
+      throw new UnauthorizedException();
+    // Réponse immédiate ; la vérification (verify) se fait ensuite, idempotente.
+    void this.reconcilePending();
+    return { received: true };
+  }
+
+  private fail(id: string) {
+    return this.prisma.feePayment.updateMany({
+      where: { id, status: 'PENDING' },
+      data: { status: 'FAILED' },
     });
   }
 
@@ -122,21 +266,27 @@ export class OnlineService {
     const given = Buffer.from(signature ?? '', 'hex');
     if (given.length !== expected.length || !timingSafeEqual(given, expected))
       throw new UnauthorizedException();
+    // Avec SasPay, seule sa vérification confirme un paiement.
+    if (saspayConfigured()) throw new NotFoundException();
 
     const payment = await this.prisma.feePayment.findUnique({
       where: { providerRef: dto.providerRef },
-      select: { id: true, schoolId: true, studentFeeId: true },
+      select: { id: true },
     });
     if (!payment) throw new NotFoundException();
 
-    if (dto.status === 'FAILED') {
-      await this.prisma.feePayment.updateMany({
-        where: { id: payment.id, status: 'PENDING' },
-        data: { status: 'FAILED' },
-      });
-      return this.statusOf(payment.id);
-    }
+    if (dto.status === 'FAILED') await this.fail(payment.id);
+    else await this.confirm(payment.id);
+    return this.statusOf(payment.id);
+  }
 
+  /** PENDING → PAID une seule fois, avec numéro de reçu. */
+  private async confirm(paymentId: string) {
+    const payment = await this.prisma.feePayment.findUnique({
+      where: { id: paymentId },
+      select: { id: true, schoolId: true, studentFeeId: true },
+    });
+    if (!payment) return;
     await this.prisma.$transaction(async (tx) => {
       // Ordre des verrous comme recordCash : StudentFee, puis School (assignReceipt).
       const locked = await tx.$queryRaw<
@@ -167,7 +317,6 @@ export class OnlineService {
           `Trop-perçu : paiement ${payment.id} (frais ${payment.studentFeeId}) dépasse le dû, à rembourser.`,
         );
     });
-    return this.statusOf(payment.id);
   }
 
   private async statusOf(id: string) {

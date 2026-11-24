@@ -10,8 +10,26 @@ import { dayLabel, FEE_METHODS, money } from "@/lib/format";
 import type { ChildFees } from "@/lib/types";
 import { simulateFeePayment, startFeePayment } from "./fee-actions";
 
-/** Tranches, solde et paiement des frais de scolarité d'un enfant. `dev` : bouton de simulation du prestataire. */
-export function FeesPanel({ schoolId, studentId, fees, dev }: { schoolId: string; studentId: string; fees: ChildFees; dev: boolean }) {
+const RETURNED = {
+  PAID: { tone: "success", text: "Paiement confirmé. Merci !" },
+  PENDING: { tone: "info", text: "Paiement en cours de confirmation : le solde sera mis à jour dès réception." },
+  FAILED: { tone: "danger", text: "Le paiement n’a pas abouti. Vous pouvez réessayer." },
+} as const;
+
+/** Tranches, solde et paiement des frais de scolarité d'un enfant. `dev` : simulation sans SasPay ; `returned` : retour de la page de paiement. */
+export function FeesPanel({
+  schoolId,
+  studentId,
+  fees,
+  dev,
+  returned,
+}: {
+  schoolId: string;
+  studentId: string;
+  fees: ChildFees;
+  dev: boolean;
+  returned?: keyof typeof RETURNED;
+}) {
   const due = fees.lines.reduce((n, l) => n + l.amount, 0);
   const remaining = due - fees.lines.reduce((n, l) => n + l.paid, 0);
   const next = fees.lines.find((l) => l.remaining > 0);
@@ -25,6 +43,7 @@ export function FeesPanel({ schoolId, studentId, fees, dev }: { schoolId: string
 
   return (
     <div className="space-y-4">
+      {returned && !ref && <StatusBadge tone={RETURNED[returned].tone}>{RETURNED[returned].text}</StatusBadge>}
       <p className="text-sm text-muted-foreground">
         {fees.label} · reste à payer <strong className="text-foreground tabular-nums">{money(remaining)}</strong> sur {money(due)}
       </p>

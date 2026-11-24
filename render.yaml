@@ -21,6 +21,14 @@ services:
         generateValue: true
       - key: PAYMENT_WEBHOOK_SECRET
         generateValue: true
+      # SasPay (paiement en ligne des frais) : clé et secret du webhook depuis app.saspay.me.
+      # Sans SASPAY_API_URL, l'API appelle le bac à sable ; en réel : https://api.saspay.me/api/v1
+      - key: SASPAY_API_KEY
+        sync: false
+      - key: SASPAY_WEBHOOK_SECRET
+        sync: false
+      - key: SASPAY_API_URL
+        sync: false
       # Neon Object Storage : valeurs posées par `neon deploy` dans .env.local
       - key: AWS_ENDPOINT_URL_S3
         sync: false
