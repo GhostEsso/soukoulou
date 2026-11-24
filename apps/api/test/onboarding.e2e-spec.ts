@@ -319,6 +319,33 @@ describe('Inscription et vérification des écoles (e2e)', () => {
       .send({ brandColor: '#0F766E' })
       .expect(403);
 
+    // Logo : toutes offres. Le type est vérifié sur les octets, pas sur le nom.
+    await http
+      .put(`/schools/${schoolId}/settings/logo`)
+      .set(auth(owner))
+      .attach('file', PDF, 'logo.png')
+      .expect(400);
+    const PNG = Buffer.from([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0,
+    ]);
+    const logo = await http
+      .put(`/schools/${schoolId}/settings/logo`)
+      .set(auth(owner))
+      .attach('file', PNG, 'logo.png')
+      .expect(200);
+    expect((await overview()).school.logo).toBe(logo.body.logo);
+    const img = await http
+      .get(`/schools/${schoolId}/logo`)
+      .set(auth(owner))
+      .expect(200);
+    expect(img.headers['content-type']).toBe('image/png');
+    await http
+      .delete(`/schools/${schoolId}/settings/logo`)
+      .set(auth(owner))
+      .expect(204);
+    expect((await overview()).school.logo).toBeNull();
+    await http.get(`/schools/${schoolId}/logo`).set(auth(owner)).expect(404);
+
     const file = await http
       .get(`/schools/${schoolId}/documents/${pending.document.id}/file`)
       .set(auth(owner))

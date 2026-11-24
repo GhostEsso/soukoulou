@@ -123,6 +123,7 @@ model School {
   suspendedReason     String?
   receiptSeq          Int                @default(0) // compteur de reçus (incrément atomique)
   brandColor          String? // couleur d'accent (#RRGGBB), offre Premium
+  logoKey             String? // logo de l'école (stockage S3)
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 

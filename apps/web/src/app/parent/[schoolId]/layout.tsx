@@ -3,7 +3,7 @@ import { feedNotices } from "@/components/announcement-feed";
 import { AppShell } from "@/components/app-shell";
 import { ApiError } from "@/lib/api";
 import { getFeed, getMe, getParentHome } from "@/lib/data";
-import { todayLabel } from "@/lib/format";
+import { logoUrl, todayLabel } from "@/lib/format";
 import { logout } from "../../(auth)/actions";
 
 /** Espace parent : le suivi de ses enfants, en lecture seule. */
@@ -23,6 +23,7 @@ export default async function ParentLayout({ children, params }: LayoutProps<"/p
   return (
     <AppShell
       title={home.school.name}
+      logo={logoUrl(schoolId, home.school.logo)}
       subtitle="Espace parent"
       groups={[
         { items: [{ href: base, label: "Accueil", icon: "home", exact: true }] },

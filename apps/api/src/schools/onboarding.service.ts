@@ -9,7 +9,7 @@ import type { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import type { AuthUser } from '../auth/decorators';
 import { PrismaService } from '../prisma/prisma.module';
-import { StorageService } from '../storage/storage.module';
+import { photoVersion, StorageService } from '../storage/storage.module';
 import { UpgradeInfoDto } from './dto';
 import {
   checkAccess,
@@ -61,10 +61,10 @@ export class OnboardingService {
       planFeatures: school.plan?.features ?? [],
       hasOverdueDocument: requirements.some((r) => r.overdue),
     };
-    const { documents, ...rest } = school;
+    const { documents, logoKey, ...rest } = school;
     void documents; // les pièces sont déjà détaillées dans requirements
     return {
-      school: rest,
+      school: { ...rest, logo: photoVersion(logoKey) },
       requirements,
       access: Object.fromEntries(NEEDS.map((n) => [n, checkAccess(state, n)])),
     };
@@ -284,6 +284,35 @@ export class OnboardingService {
       data: { brandColor: brandColor?.toUpperCase() ?? null },
     });
     return this.overview(schoolId);
+  }
+
+  /** Logo de l'école (toutes offres). Remplace l'ancien, ou le retire si `file` est absent. */
+  async setLogo(schoolId: string, file: Express.Multer.File | null) {
+    const { access, denial } = await this.can(schoolId, 'write');
+    if (!access) throw new ForbiddenException(denial);
+    const { logoKey: old } = await this.prisma.school.findUniqueOrThrow({
+      where: { id: schoolId },
+      select: { logoKey: true },
+    });
+    const logoKey = file
+      ? await this.storage.putImage(`${schoolId}/logo`, file)
+      : null;
+    await this.prisma.school.update({
+      where: { id: schoolId },
+      data: { logoKey },
+    });
+    if (old) await this.storage.remove(old);
+    return { logo: photoVersion(logoKey) };
+  }
+
+  /** Le logo n'a rien de confidentiel : tout utilisateur connecté peut le lire. */
+  async openLogo(schoolId: string) {
+    const s = await this.prisma.school.findUnique({
+      where: { id: schoolId },
+      select: { logoKey: true },
+    });
+    if (!s?.logoKey) throw new NotFoundException();
+    return this.storage.get(s.logoKey);
   }
 
   /** Vérifie une action pour une école (statut, offre, vérification, pièces en retard). */

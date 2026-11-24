@@ -3,7 +3,7 @@ import { AppShell, type NavItem } from "@/components/app-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { ApiError } from "@/lib/api";
 import { brandColorOf, getMe, getOnboarding } from "@/lib/data";
-import { SUBSCRIPTION, todayLabel } from "@/lib/format";
+import { logoUrl, SUBSCRIPTION, todayLabel } from "@/lib/format";
 import { schoolNotices } from "@/lib/notices";
 import { logout } from "../../(auth)/actions";
 import { StatusBanner } from "./status-banner";
@@ -99,6 +99,7 @@ export default async function SchoolLayout({ children, params }: LayoutProps<"/e
       )}
       <AppShell
         title={school.name}
+        logo={logoUrl(school.id, school.logo)}
         subtitle={school.slug ? `${school.slug}.soukoulou.com` : `${school.city}`}
         groups={groups}
         user={{ name: `${me.firstName} ${me.lastName}`, email: me.email }}

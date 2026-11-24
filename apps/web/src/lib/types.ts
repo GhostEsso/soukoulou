@@ -80,6 +80,7 @@ export interface School {
   subscriptionEndsAt: string | null;
   suspendedReason: string | null;
   brandColor: string | null;
+  logo: string | null;
   createdAt: string;
 }
 
@@ -477,7 +478,7 @@ export interface TeacherHome {
   id: string;
   firstName: string;
   lastName: string;
-  school: { name: string };
+  school: { name: string; logo: string | null };
   teachings: { classroom: { id: string; name: string }; subject: { id: string; name: string } }[];
   slots: Slot[];
 }
@@ -486,7 +487,7 @@ export interface TeacherHome {
 export interface ParentHome {
   firstName: string;
   lastName: string;
-  school: { name: string };
+  school: { name: string; logo: string | null };
   children: {
     id: string;
     firstName: string;
@@ -521,7 +522,7 @@ export interface DisciplineRecord {
 
 /** Espace élève : son propre suivi. */
 export interface StudentHome extends ChildFollowUp {
-  school: { name: string };
+  school: { name: string; logo: string | null };
 }
 
 export type Audience = "TEACHER" | "PARENT" | "STUDENT";
