@@ -467,6 +467,35 @@ describe('Frais de scolarité : grille et montants figés (e2e)', () => {
       expect(typeof mine?.payer).toBe('string');
     });
 
+    it('derniers paiements : filtre par nom d’élève ou de parent', async () => {
+      const recent = async (q: string) =>
+        (
+          await http
+            .get(
+              `${base()}/dashboard?yearId=${yearId}&q=${encodeURIComponent(q)}`,
+            )
+            .set(auth())
+            .expect(200)
+        ).body.recent as { id: string; student: string }[];
+      const byStudent = await recent('caisse test');
+      expect(byStudent.map((r) => r.id)).toContain(paymentId);
+      expect(byStudent.every((r) => r.student === 'Caisse TEST')).toBe(true);
+
+      await prisma.parent.create({
+        data: {
+          schoolId,
+          firstName: 'Yawa',
+          lastName: 'Filtre',
+          phone: '+22890000099',
+          children: { create: { studentId, relation: 'MOTHER' } },
+        },
+      });
+      expect((await recent('YAWA filtre')).map((r) => r.id)).toContain(
+        paymentId,
+      );
+      expect(await recent('inconnu-xyz')).toEqual([]);
+    });
+
     it('tableau de bord en Essentiel : 403 PLAN', async () => {
       const e = await makeSchool('ess2', 'ESSENTIEL');
       const res = await http

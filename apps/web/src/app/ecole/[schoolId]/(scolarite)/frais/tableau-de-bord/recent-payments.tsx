@@ -1,14 +1,22 @@
 import Link from "next/link";
+import { SearchInput } from "@/components/search-input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { dateTime, FEE_METHODS, money } from "@/lib/format";
 import type { FeeDashboard } from "@/lib/types";
 import { Panel } from "../../../dashboard";
 
 /** Derniers paiements : qui a payé, quand, pour quel enfant, et ce qu'il restait ensuite. */
-export function RecentPayments({ schoolId, items }: { schoolId: string; items: FeeDashboard["recent"] }) {
+export function RecentPayments({ schoolId, items, q }: { schoolId: string; items: FeeDashboard["recent"]; q: string }) {
   const s = encodeURIComponent(schoolId);
   return (
-    <Panel title="Derniers paiements">
+    <Panel title={q ? `Paiements pour « ${q} »` : "Derniers paiements"}>
+      <div className="mb-4">
+        <SearchInput
+          defaultValue={q}
+          placeholder="Nom d’un élève ou d’un parent…"
+          label="Filtrer les paiements par élève ou par parent"
+        />
+      </div>
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
@@ -25,7 +33,7 @@ export function RecentPayments({ schoolId, items }: { schoolId: string; items: F
             {items.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                  Aucun paiement pour l’instant.
+                  {q ? "Aucun paiement pour cette recherche." : "Aucun paiement pour l’instant."}
                 </TableCell>
               </TableRow>
             ) : (

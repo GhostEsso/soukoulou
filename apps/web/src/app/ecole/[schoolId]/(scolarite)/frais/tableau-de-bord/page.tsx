@@ -11,13 +11,15 @@ import { RecentPayments } from "./recent-payments";
 
 export const metadata: Metadata = { title: "Frais : tableau de bord" };
 
-export default async function FeeDashboardPage({ params }: PageProps<"/ecole/[schoolId]/frais/tableau-de-bord">) {
+export default async function FeeDashboardPage({ params, searchParams }: PageProps<"/ecole/[schoolId]/frais/tableau-de-bord">) {
   const { schoolId } = await params;
+  const q = String((await searchParams).q ?? "").trim();
   const [onboarding, structure] = await Promise.all([getOnboarding(schoolId), getStructure(schoolId)]);
   const denied = <PlanDenied schoolId={schoolId} title="Tableau de bord des frais" />;
   if (!hasFeature(onboarding, "fee_tracking")) return denied;
   const year = feeYear(structure);
-  const d = await api<FeeDashboard>(`/schools/${encodeURIComponent(schoolId)}/fees/dashboard${year ? `?yearId=${encodeURIComponent(year.id)}` : ""}`).catch((e) => {
+  const query = new URLSearchParams({ ...(year && { yearId: year.id }), ...(q && { q }) });
+  const d = await api<FeeDashboard>(`/schools/${encodeURIComponent(schoolId)}/fees/dashboard${query.size ? `?${query}` : ""}`).catch((e) => {
     if (e instanceof ApiError && e.status === 403) return null;
     throw e;
   });
@@ -46,7 +48,7 @@ export default async function FeeDashboardPage({ params }: PageProps<"/ecole/[sc
           <TabsTrigger value="classes">Par classe et en ligne</TabsTrigger>
         </TabsList>
         <TabsContent value="paiements">
-          <RecentPayments schoolId={schoolId} items={d.recent} />
+          <RecentPayments schoolId={schoolId} items={d.recent} q={q} />
         </TabsContent>
         <TabsContent value="classes">
           <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">

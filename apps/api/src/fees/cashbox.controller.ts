@@ -84,11 +84,12 @@ export class CashboxController {
     @CurrentUser() u: AuthUser,
     @Param('schoolId') s: string,
     @Query('yearId') yearId?: string,
+    @Query('q') q?: string,
   ) {
     await this.admin(u.id, s, {
       need: 'read',
       feature: FEATURES.FEE_TRACKING,
     });
-    return this.cashbox.dashboard(s, yearId);
+    return this.cashbox.dashboard(s, yearId, q?.slice(0, 100));
   }
 }
