@@ -24,6 +24,7 @@ import { GradesModule } from './grades/grades.module';
 import { ParentsModule } from './parents/parents.module';
 import { AttendanceModule } from './attendance/attendance.module';
 import { StudentsModule } from './students/students.module';
+import { FeesModule } from './fees/fees.module';
 import { StructureModule } from './structure/structure.module';
 import { SchoolsModule } from './schools/schools.module';
 
@@ -56,6 +57,7 @@ function validateEnv(env: Record<string, unknown>) {
     PlatformModule,
     StructureModule,
     StudentsModule,
+    FeesModule,
     AttendanceModule,
     TeachersModule,
     TeacherSpaceModule,
