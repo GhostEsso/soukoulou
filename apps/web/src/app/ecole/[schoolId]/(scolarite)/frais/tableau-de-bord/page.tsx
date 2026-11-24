@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, ApiError } from "@/lib/api";
 import { feeYear, getOnboarding, getStructure, hasFeature } from "@/lib/data";
@@ -39,55 +40,65 @@ export default async function FeeDashboardPage({ params }: PageProps<"/ecole/[sc
           </li>
         ))}
       </ul>
-      <RecentPayments schoolId={schoolId} items={d.recent} />
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <Panel title="Par classe">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Classe</TableHead>
-                  <TableHead className="text-right">Attendu</TableHead>
-                  <TableHead className="text-right">Encaissé</TableHead>
-                  <TableHead className="text-right">Reste</TableHead>
-                  <TableHead className="text-right">En retard</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {d.byClassroom.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
-                      Aucun frais enregistré.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  d.byClassroom.map((c) => (
-                    <TableRow key={c.classroomId ?? "none"}>
-                      <TableCell className="font-medium">{c.classroom ?? "Sans classe"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{money(c.due)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{money(c.collected)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{money(c.remaining)}</TableCell>
-                      <TableCell className={`text-right tabular-nums ${c.overdue > 0 ? "text-destructive" : ""}`}>{money(c.overdue)}</TableCell>
+      <Tabs defaultValue="paiements">
+        <TabsList>
+          <TabsTrigger value="paiements">Derniers paiements</TabsTrigger>
+          <TabsTrigger value="classes">Par classe et en ligne</TabsTrigger>
+        </TabsList>
+        <TabsContent value="paiements">
+          <RecentPayments schoolId={schoolId} items={d.recent} />
+        </TabsContent>
+        <TabsContent value="classes">
+          <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
+            <Panel title="Par classe">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Classe</TableHead>
+                      <TableHead className="text-right">Attendu</TableHead>
+                      <TableHead className="text-right">Encaissé</TableHead>
+                      <TableHead className="text-right">Reste</TableHead>
+                      <TableHead className="text-right">En retard</TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {d.byClassroom.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                          Aucun frais enregistré.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      d.byClassroom.map((c) => (
+                        <TableRow key={c.classroomId ?? "none"}>
+                          <TableCell className="font-medium">{c.classroom ?? "Sans classe"}</TableCell>
+                          <TableCell className="text-right tabular-nums">{money(c.due)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{money(c.collected)}</TableCell>
+                          <TableCell className="text-right tabular-nums">{money(c.remaining)}</TableCell>
+                          <TableCell className={`text-right tabular-nums ${c.overdue > 0 ? "text-destructive" : ""}`}>{money(c.overdue)}</TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </Panel>
+            <Panel title="En ligne">
+              <dl className="space-y-3 text-sm">
+                <div>
+                  <dt className="text-muted-foreground">Encaissé en ligne</dt>
+                  <dd className="text-lg font-semibold tabular-nums">{money(d.online.collected)}</dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Disponible pour un décaissement</dt>
+                  <dd className="text-lg font-semibold tabular-nums">{money(d.online.available)}</dd>
+                </div>
+              </dl>
+            </Panel>
           </div>
-        </Panel>
-        <Panel title="En ligne">
-          <dl className="space-y-3 text-sm">
-            <div>
-              <dt className="text-muted-foreground">Encaissé en ligne</dt>
-              <dd className="text-lg font-semibold tabular-nums">{money(d.online.collected)}</dd>
-            </div>
-            <div>
-              <dt className="text-muted-foreground">Disponible pour un décaissement</dt>
-              <dd className="text-lg font-semibold tabular-nums">{money(d.online.available)}</dd>
-            </div>
-          </dl>
-        </Panel>
-      </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
