@@ -8,3 +8,5 @@ uploads
 .claude-flow
 .DS_Store
 prod.env
+.neon
+.env.local

@@ -143,20 +143,19 @@ pnpm test:api
 
 ### Déploiement <a name="deployment"></a>
 
-Production gratuite, sans carte bancaire : web sur [Vercel](https://vercel.com/), API sur [Render](https://render.com/), PostgreSQL sur [Neon](https://neon.com/), fichiers sur [Supabase Storage](https://supabase.com/) (compatible S3).
+Production gratuite, sans carte bancaire : web sur [Vercel](https://vercel.com/), API sur [Render](https://render.com/), PostgreSQL et fichiers (Object Storage, compatible S3) sur [Neon](https://neon.com/), à Francfort.
 
-1. **Secret partagé** : générer `API_SECRET` (`openssl rand -base64 32`). Il sert sur Render, Vercel et GitHub.
-2. **Neon** : créer un projet, copier la chaîne de connexion **directe** (sans `-pooler`).
-3. **Supabase** : créer un projet, un bucket privé `soukoulou` (Storage), puis des clés S3 (Storage → S3 Connection) : endpoint, région, access key, secret key.
-4. **Render** : New → Blueprint → ce dépôt (`render.yaml`), saisir les variables. Les migrations s'appliquent à chaque démarrage.
-5. **Vercel** : importer le dépôt, dossier racine `apps/web`, variables `API_URL` (URL Render) et `API_SECRET`. Reporter ensuite l'URL Vercel dans `WEB_URL` sur Render.
-6. **GitHub** (Settings → Secrets and variables → Actions) : variable `API_URL`, secret `API_SECRET`. La tâche quotidienne tourne alors à 6 h UTC (`.github/workflows/daily.yml`).
-7. **Compte admin**, une seule fois, depuis `apps/api` :
+1. **Neon** : `neon.ts` décrit les services (Postgres, bucket privé `soukoulou`). `npx neon@latest login` puis `npx neon@latest deploy` : les variables arrivent dans `.env.local` (jamais commité).
+2. **Secret partagé** : générer `API_SECRET` (`openssl rand -base64 32`). Il sert sur Render, Vercel et GitHub.
+3. **Render** : New → Blueprint → ce dépôt (`render.yaml`). `DATABASE_URL` = la valeur `DATABASE_URL_UNPOOLED` de Neon ; recopier les 4 variables `AWS_*`. Les migrations s'appliquent à chaque démarrage.
+4. **Vercel** : importer le dépôt, dossier racine `apps/web`, variables `API_URL` (URL Render) et `API_SECRET`. Reporter ensuite l'URL Vercel dans `WEB_URL` sur Render.
+5. **GitHub** (Settings → Secrets and variables → Actions) : variable `API_URL`, secret `API_SECRET`. La tâche quotidienne tourne alors à 6 h UTC (`.github/workflows/daily.yml`).
+6. **Données de base et compte admin**, une seule fois, depuis `apps/api` :
    ```sh
-   DATABASE_URL="<neon>" SEED_ADMIN_EMAIL="<email>" SEED_ADMIN_PASSWORD="<mot de passe>" npx prisma db seed
+   DATABASE_URL="<DATABASE_URL_UNPOOLED>" SEED_ADMIN_EMAIL="<email>" SEED_ADMIN_PASSWORD="<mot de passe>" npx prisma db seed
    ```
 
-Limites de l'offre gratuite : l'API se met en veille après 15 min sans visite (environ 1 min au réveil) ; un projet Supabase sans activité pendant une semaine est mis en pause (à relancer depuis son tableau de bord) ; Vercel limite les envois à 4,5 Mo.
+Limites de l'offre gratuite : l'API se met en veille après 15 min sans visite (environ 1 min au réveil) ; Neon offre 5 Go de fichiers et 5 Go de transfert par mois ; Vercel limite les envois à 4,5 Mo.
 
 Sur un serveur à soi, `docker-compose.prod.yml` lance tout (web, API, PostgreSQL, MinIO) avec les variables de `prod.env.example` ; seul le web est exposé.
 

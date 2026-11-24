@@ -5,5 +5,9 @@
     "db:up": "docker compose up -d db",
     "dev:api": "pnpm --filter api start:dev",
     "test:api": "pnpm --filter api test:e2e"
+  },
+  "dependencies": {
+    "@neon/config": "^1.14.6",
+    "@neon/env": "^2.1.9"
   }
 }
