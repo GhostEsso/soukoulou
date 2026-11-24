@@ -57,7 +57,8 @@ const feeInclude = {
 export class CashboxService {
   constructor(private readonly prisma: PrismaService) {}
 
-  private async yearId(schoolId: string, yearId?: string) {
+  /** Année de référence : l'année demandée, sinon la courante, sinon la plus récente. */
+  async yearId(schoolId: string, yearId?: string) {
     const year = await this.prisma.academicYear.findFirst({
       where: { schoolId, ...(yearId && { id: yearId }) },
       orderBy: [{ isCurrent: 'desc' }, { startsOn: 'desc' }],

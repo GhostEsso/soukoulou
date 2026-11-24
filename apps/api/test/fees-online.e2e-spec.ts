@@ -136,7 +136,7 @@ describe('Frais de scolarité : paiement en ligne des parents (e2e)', () => {
         auth: { Authorization: `Bearer ${token}` },
       };
     };
-    return { schoolId: school.id, family };
+    return { schoolId: school.id, yearId: year.id, family };
   }
 
   const checkout = (
@@ -280,5 +280,43 @@ describe('Frais de scolarité : paiement en ligne des parents (e2e)', () => {
       403,
     );
     expect(JSON.stringify(res.body)).toContain('PLAN');
+  });
+
+  it('frais seulement dans une autre année que l’année courante : 404', async () => {
+    const { schoolId, yearId, family } = await setup('yr', 'STANDARD');
+    const f = await family('Kodjo');
+    await prisma.academicYear.update({
+      where: { id: yearId },
+      data: { isCurrent: false },
+    });
+    await prisma.academicYear.create({
+      data: {
+        schoolId,
+        label: '2027-2028',
+        startsOn: new Date('2027-09-01'),
+        endsOn: new Date('2028-07-01'),
+        periodType: 'TRIMESTER',
+        isCurrent: true,
+      },
+    });
+    await checkout(schoolId, f.studentId, f.auth, 1_000).expect(404);
+    expect(
+      await prisma.feePayment.count({
+        where: { studentFee: { studentId: f.studentId } },
+      }),
+    ).toBe(0);
+  });
+
+  it('élève d’une autre école avec l’école du parent dans l’URL : 404', async () => {
+    const a = await setup('xa', 'STANDARD');
+    const b = await setup('xb', 'STANDARD');
+    const pa = await a.family('Ewe');
+    const sb = await b.family('Mina');
+    await checkout(a.schoolId, sb.studentId, pa.auth, 1_000).expect(404);
+    expect(
+      await prisma.feePayment.count({
+        where: { studentFee: { studentId: sb.studentId } },
+      }),
+    ).toBe(0);
   });
 });

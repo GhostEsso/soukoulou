@@ -12,7 +12,7 @@ import { PrismaService } from '../prisma/prisma.module';
 import { OnboardingService } from '../schools/onboarding.service';
 import type { PaymentWebhookDto } from '../schools/dto';
 import { FEATURES } from '../schools/rules';
-import { assignReceipt, fmt } from './cashbox.service';
+import { assignReceipt, CashboxService, fmt } from './cashbox.service';
 
 /** Paiement en ligne des frais par le parent : ouverture du paiement, puis confirmation du prestataire. */
 @Injectable()
@@ -23,6 +23,7 @@ export class OnlineService {
     private readonly prisma: PrismaService,
     private readonly onboarding: OnboardingService,
     private readonly config: ConfigService,
+    private readonly cashbox: CashboxService,
   ) {}
 
   async checkout(
@@ -46,15 +47,15 @@ export class OnlineService {
       FEATURES.FEE_PAYMENTS,
     );
     if (!access) throw new ForbiddenException(denial);
-    // Même année que la caisse : l'année en cours, sinon la plus récente.
-    const fee = await this.prisma.studentFee.findFirst({
-      where: { schoolId, studentId },
-      orderBy: [
-        { year: { isCurrent: 'desc' } },
-        { year: { startsOn: 'desc' } },
-      ],
-      select: { id: true },
-    });
+    // Même année que la caisse et la vue du parent : l'année courante (sinon la plus récente) ;
+    // jamais le repli sur une autre année, dont aucun écran ne montrerait le solde.
+    const yearId = await this.cashbox.yearId(schoolId);
+    const fee = yearId
+      ? await this.prisma.studentFee.findFirst({
+          where: { schoolId, studentId, yearId },
+          select: { id: true },
+        })
+      : null;
     if (!fee) throw new NotFoundException('Aucun frais pour cet élève.');
 
     return this.prisma.$transaction(async (tx) => {
