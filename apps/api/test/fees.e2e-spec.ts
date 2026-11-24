@@ -167,6 +167,24 @@ describe('Frais de scolarité : grille et montants figés (e2e)', () => {
     expect(total(await feeOf(after))).toBe(50_000);
   });
 
+  it('refuse de changer l’année d’une règle', async () => {
+    const other = await prisma.academicYear.create({
+      data: {
+        schoolId,
+        label: '2027-2028',
+        startsOn: new Date('2027-09-01'),
+        endsOn: new Date('2028-07-01'),
+        periodType: 'TRIMESTER',
+      },
+    });
+    const res = await http
+      .patch(`/schools/${schoolId}/fees/schedules/${scheduleId}`)
+      .set(auth())
+      .send({ ...rule([lv['6e']]), yearId: other.id })
+      .expect(400);
+    expect(res.body.message).toBe("L'année d'une règle ne peut pas changer.");
+  });
+
   it('un élève sans règle (2nde) n’a pas de dû', async () => {
     const id = await enroll('Edem', cl['2nde']);
     expect(await feeOf(id)).toBeNull();

@@ -61,7 +61,13 @@ export class FeesService {
   }
 
   private async save(schoolId: string, id: string | null, dto: ScheduleDto) {
-    if (id) await this.own(schoolId, id);
+    if (id) {
+      const own = await this.own(schoolId, id);
+      if (own.yearId !== dto.yearId)
+        throw new BadRequestException(
+          "L'année d'une règle ne peut pas changer.",
+        );
+    }
     const year = await this.prisma.academicYear.findFirst({
       where: { id: dto.yearId, schoolId },
       select: { id: true },
@@ -141,9 +147,10 @@ export class FeesService {
   private async own(schoolId: string, id: string) {
     const s = await this.prisma.feeSchedule.findFirst({
       where: { id, schoolId },
-      select: { id: true },
+      select: { id: true, yearId: true },
     });
     if (!s) throw new NotFoundException('Règle introuvable.');
+    return s;
   }
 
   /** Fige le dû des élèves inscrits qui n'en ont pas encore ; ne modifie jamais un dû existant. */

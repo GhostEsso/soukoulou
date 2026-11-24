@@ -9,6 +9,7 @@ import {
   IsString,
   Length,
   Matches,
+  Max,
   Min,
   ValidateIf,
   ValidateNested,
@@ -17,6 +18,7 @@ import {
 export class LineDto {
   @IsInt({ message: 'Montant invalide.' })
   @Min(1, { message: 'Montant invalide.' })
+  @Max(100_000_000, { message: 'Montant invalide.' })
   amount!: number;
   @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'Date invalide.' })
   dueOn!: string;
