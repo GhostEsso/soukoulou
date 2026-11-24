@@ -84,12 +84,25 @@ export const METHODS: Record<PaymentMethod, string> = {
   TRANSFER: "Virement ou dépôt",
 };
 
+export const FEE_METHODS = { CASH: "Espèces", MOBILE_MONEY: "Mobile Money", CARD: "Carte bancaire" } as const;
+
+export const PAYOUT_STATUS: Record<"REQUESTED" | "PAID" | "REJECTED", { label: string; tone: Tone }> = {
+  REQUESTED: { label: "Demandé", tone: "info" },
+  PAID: { label: "Versé", tone: "success" },
+  REJECTED: { label: "Rejeté", tone: "danger" },
+};
+
+/** « AAAA-MM-JJ » (ou ISO) → « 5 janvier 2027 », sans décalage de fuseau. */
+export const dayLabel = (d: string) =>
+  new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" }).format(new Date(d.slice(0, 10)));
+
 export const FEATURE_LABELS: Record<string, string> = {
   core: "Élèves, classes, notes, bulletins, discipline, annonces",
   homework: "Cahier de textes",
   messaging: "Messagerie école ↔ parents",
   fee_payments: "Paiement des frais par Mobile Money",
-  cashbox: "Suivi de caisse et relances",
+  cashbox: "Caisse, reçus et soldes des frais de scolarité",
+  fee_tracking: "Frais en plusieurs tranches, relances et tableau de bord",
   custom_report_cards: "Bulletins personnalisés",
   advanced_stats: "Statistiques avancées",
   exports: "Exports Excel et PDF",

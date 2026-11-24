@@ -16,5 +16,5 @@ export default async function ChildPage({ params, searchParams }: PageProps<"/pa
     if (e instanceof ApiError && (e.status === 403 || e.status === 404)) notFound();
     throw e;
   });
-  return <FollowUp schoolId={schoolId} data={data} here={`/parent/${schoolId}/enfants/${studentId}`} periodId={one(sp.periode)} />;
+  return <FollowUp schoolId={schoolId} data={data} here={`/parent/${schoolId}/enfants/${studentId}`} periodId={one(sp.periode)} payment={{ studentId, dev: process.env.NODE_ENV !== "production" }} />;
 }

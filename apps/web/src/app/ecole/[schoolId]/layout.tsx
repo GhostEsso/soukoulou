@@ -59,6 +59,19 @@ export default async function SchoolLayout({ children, params }: LayoutProps<"/e
           },
         ]
       : []),
+    ...(!discovery
+      ? [
+          {
+            label: "Frais de scolarité",
+            items: [
+              { href: `${base}/frais`, label: "Soldes", icon: "fees" as const, exact: true },
+              { href: `${base}/frais/grille`, label: "Grille des frais", icon: "feeGrid" as const },
+              { href: `${base}/frais/tableau-de-bord`, label: "Suivi", icon: "feeStats" as const },
+              { href: `${base}/frais/decaissements`, label: "Décaissements", icon: "payouts" as const },
+            ],
+          },
+        ]
+      : []),
     {
       label: "Mon école",
       items: [

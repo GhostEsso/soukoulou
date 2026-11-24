@@ -7,17 +7,21 @@ import { ScheduleView } from "@/app/ecole/[schoolId]/(scolarite)/schedule-view";
 import { todayISO } from "@/lib/format";
 import type { ChildFollowUp } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { FeesPanel } from "./fees-panel";
 
 const fr = (n: number) => n.toLocaleString("fr-FR", { maximumFractionDigits: 2 });
 
 /** Suivi d'un élève : moyenne, rang, notes par période, assiduité, emploi du temps. Espaces parent et élève. */
 export function FollowUp({
   schoolId,
-  data: { child, report, attendance, slots, discipline },
+  data: { child, report, attendance, slots, discipline, fees },
   here,
   periodId,
   aside,
+  payment,
 }: {
+  /** Espace parent : paiement des frais ; absent dans l'espace élève. */
+  payment?: { studentId: string; dev: boolean };
   /** Bloc en plus dans la colonne de droite (annonces dans l'espace élève). */
   aside?: React.ReactNode;
   schoolId: string;
@@ -82,6 +86,11 @@ export function FollowUp({
           )}
         </div>
         <aside className="min-w-0 space-y-6">
+          {fees && payment && (
+            <Panel title="Frais de scolarité">
+              <FeesPanel schoolId={schoolId} studentId={payment.studentId} fees={fees} dev={payment.dev} />
+            </Panel>
+          )}
           <Panel title="Assiduité">
             <AttendanceSummary attendance={attendance} />
           </Panel>
