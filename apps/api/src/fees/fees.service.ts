@@ -156,11 +156,20 @@ export class FeesService {
   /** Recalcule les élèves de la règle sans aucun paiement (tout statut) ; les autres gardent leur montant. */
   async reapplySchedule(schoolId: string, id: string) {
     const { yearId } = await this.own(schoolId, id);
-    await this.prisma.studentFee.deleteMany({
-      where: { schoolId, scheduleId: id, payments: { none: {} } },
+    const where = { schoolId, scheduleId: id };
+    const kept = await this.prisma.$transaction(async (tx) => {
+      // Verrou d'abord (comme la caisse), puis suppression : nouvelle requête = « sans paiement » relu après les encaissements concurrents.
+      const rows = await tx.$queryRaw<{ id: string }[]>`
+        SELECT id FROM "StudentFee" WHERE "schoolId" = ${schoolId} AND "scheduleId" = ${id} FOR UPDATE`;
+      await tx.studentFee.deleteMany({
+        where: { id: { in: rows.map((r) => r.id) }, payments: { none: {} } },
+      });
+      return tx.studentFee.count({ where });
     });
-    const { created } = await this.applySchedules(schoolId, yearId);
-    return { recomputed: created };
+    await this.applySchedules(schoolId, yearId);
+    return {
+      recomputed: (await this.prisma.studentFee.count({ where })) - kept,
+    };
   }
 
   /** Fige le dû des élèves inscrits qui n'en ont pas encore ; ne modifie jamais un dû existant. */

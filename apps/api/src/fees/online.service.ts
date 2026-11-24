@@ -69,7 +69,11 @@ export class OnlineService {
 
     return this.prisma.$transaction(async (tx) => {
       // Même verrou que l'encaissement en caisse : le reste à payer est lu sans concurrence.
-      await tx.$queryRaw`SELECT id FROM "StudentFee" WHERE id = ${fee.id} FOR UPDATE`;
+      const locked = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM "StudentFee" WHERE id = ${fee.id} FOR UPDATE`;
+      if (!locked.length)
+        throw new NotFoundException('Aucun frais pour cet élève.');
       const [lines, paid] = await Promise.all([
         tx.studentFeeLine.aggregate({
           where: { studentFeeId: fee.id },
@@ -135,7 +139,10 @@ export class OnlineService {
 
     await this.prisma.$transaction(async (tx) => {
       // Ordre des verrous comme recordCash : StudentFee, puis School (assignReceipt).
-      await tx.$queryRaw`SELECT id FROM "StudentFee" WHERE id = ${payment.studentFeeId} FOR UPDATE`;
+      const locked = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM "StudentFee" WHERE id = ${payment.studentFeeId} FOR UPDATE`;
+      if (!locked.length) return; // dû supprimé entre-temps
       const now = new Date();
       const { count } = await tx.feePayment.updateMany({
         where: { id: payment.id, status: 'PENDING' },
@@ -164,10 +171,11 @@ export class OnlineService {
   }
 
   private async statusOf(id: string) {
-    const p = await this.prisma.feePayment.findUniqueOrThrow({
+    const p = await this.prisma.feePayment.findUnique({
       where: { id },
       select: { status: true },
     });
+    if (!p) throw new NotFoundException();
     return { status: p.status };
   }
 }

@@ -281,15 +281,17 @@ export class StudentsService {
   async remove(schoolId: string, id: string) {
     await this.assertWrite(schoolId);
     const { userId, photoKey } = await this.own(schoolId, id);
-    const paid = await this.prisma.feePayment.count({
-      where: { studentFee: { studentId: id }, status: { not: 'FAILED' } },
-    });
-    if (paid)
-      throw new ConflictException(
-        'Cet élève a des paiements enregistrés : il ne peut pas être supprimé.',
-      );
     // ponytail: suppression définitive ; à remplacer par un archivage quand notes et paiements existeront.
     await this.prisma.$transaction(async (tx) => {
+      // Verrou des dus avant de compter : un encaissement concurrent est vu, ou attend la suppression.
+      await tx.$queryRaw`SELECT id FROM "StudentFee" WHERE "studentId" = ${id} FOR UPDATE`;
+      const paid = await tx.feePayment.count({
+        where: { studentFee: { studentId: id }, status: { not: 'FAILED' } },
+      });
+      if (paid)
+        throw new ConflictException(
+          'Cet élève a des paiements enregistrés : il ne peut pas être supprimé.',
+        );
       await tx.student.delete({ where: { id } });
       if (userId) await removeAccess(tx, userId, schoolId);
     });

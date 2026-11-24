@@ -178,7 +178,11 @@ export class CashboxService {
 
     return this.prisma.$transaction(async (tx) => {
       // Verrou sur le dû : deux encaissements simultanés se suivent au lieu de se croiser.
-      await tx.$queryRaw`SELECT id FROM "StudentFee" WHERE id = ${fee.id} FOR UPDATE`;
+      const locked = await tx.$queryRaw<
+        { id: string }[]
+      >`SELECT id FROM "StudentFee" WHERE id = ${fee.id} FOR UPDATE`;
+      if (!locked.length)
+        throw new NotFoundException('Aucun frais pour cet élève.');
       const [lines, paid] = await Promise.all([
         tx.studentFeeLine.aggregate({
           where: { studentFeeId: fee.id },

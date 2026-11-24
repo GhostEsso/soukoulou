@@ -239,7 +239,7 @@ describe('Frais de scolarité : grille et montants figés (e2e)', () => {
       .post(`/schools/${schoolId}/fees/schedules/${r.body.id}/reapply`)
       .set(auth())
       .expect(200);
-    expect(res.body.recomputed).toBeGreaterThanOrEqual(1);
+    expect(res.body.recomputed).toBe(1);
     expect(total(await feeOf(free))).toBe(15_000);
     expect(total(await feeOf(paid))).toBe(10_000); // un paiement, même échoué : dû gardé
     await http
