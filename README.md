@@ -17,6 +17,7 @@
   - [Installation](#setup)
   - [Utilisation](#usage)
   - [Tests](#run-tests)
+  - [Déploiement](#deployment)
 - [👥 Auteur](#authors)
 - [🔭 Prochaines fonctionnalités](#future-features)
 - [📝 Licence](#license)
@@ -140,6 +141,19 @@ Les tests e2e utilisent une base dédiée `soukoulou_test` (créez-la une fois d
 docker compose exec db createdb -U soukoulou soukoulou_test
 pnpm test:api
 ```
+
+### Déploiement <a name="deployment"></a>
+
+Production gratuite : une VM [Oracle Cloud Always Free](https://www.oracle.com/cloud/free/) (ARM) avec [Coolify](https://coolify.io/).
+
+1. Installer Coolify sur la VM : `curl -fsSL https://cdn.coollabs.io/coolify/install.sh | sudo bash`
+2. Dans Coolify, ajouter le dépôt GitHub en ressource **Docker Compose**, fichier `docker-compose.prod.yml`.
+3. Saisir les variables de `prod.env.example` et donner le domaine au service `web` (port 3000).
+4. Déployer, puis créer le compte admin une seule fois : `npx prisma db seed` dans le conteneur `api`.
+
+Seul le service web est exposé ; l'API, PostgreSQL et MinIO restent sur le réseau interne. Les migrations s'appliquent à chaque démarrage de l'API.
+
+<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
 
 <p align="right">(<a href="#readme-top">retour en haut</a>)</p>
 

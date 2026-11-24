@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.next
+**/.env*
+**/uploads
+**/*.tsbuildinfo
+**/.claude-flow
+.git
+.demo-login.txt
+prod.env

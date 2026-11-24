@@ -1,5 +1,5 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers as nextHeaders } from "next/headers";
 import { redirect } from "next/navigation";
 import { ACCESS_COOKIE } from "./session";
 
@@ -48,6 +48,9 @@ export async function api<T>(
     const token = (await cookies()).get(ACCESS_COOKIE)?.value;
     if (token) headers.set("Authorization", `Bearer ${token}`);
   }
+  // IP du visiteur (posée par Caddy) : sans elle, l'API limiterait les connexions pour tout le site à la fois.
+  const ip = (await nextHeaders()).get("x-forwarded-for");
+  if (ip) headers.set("X-Forwarded-For", ip);
 
   const res = await fetch(`${API_URL}${path}`, {
     ...rest,
