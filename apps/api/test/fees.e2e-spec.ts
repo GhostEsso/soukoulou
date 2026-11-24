@@ -226,4 +226,156 @@ describe('Frais de scolarité : grille et montants figés (e2e)', () => {
     expect(res.body.message).toBe('Plusieurs tranches : offre Standard.');
     await post({ ...body, lines: lines(40_000) }).expect(201);
   });
+  describe('caisse, reçus, tableau de bord', () => {
+    const YEAR = new Date().getUTCFullYear();
+    const base = () => `/schools/${schoolId}/fees`;
+    let studentId: string;
+    let paymentId: string;
+
+    it('encaisse 25 000 sur 40 000 : reçu n°1, reste 15 000 ; 2e encaissement : n°2', async () => {
+      await http
+        .post(`${base()}/schedules`)
+        .set(auth())
+        .send(
+          rule(
+            [lv['6e'], lv['5e']],
+            [
+              { amount: 25_000, dueOn: '2020-01-15' },
+              { amount: 15_000, dueOn: '2020-02-15' },
+            ],
+          ),
+        )
+        .expect(201);
+      studentId = await enroll('Caisse', cl['5e']);
+      const res = await http
+        .post(`${base()}/payments`)
+        .set(auth())
+        .send({ studentId, amount: 25_000 })
+        .expect(201);
+      paymentId = res.body.id;
+      expect(res.body.receiptNumber).toBe(`REC-${YEAR}-000001`);
+      expect(res.body.method).toBe('CASH');
+      expect(res.body.status).toBe('PAID');
+
+      const detail = await http
+        .get(`${base()}/students/${studentId}`)
+        .set(auth())
+        .expect(200);
+      expect(
+        detail.body.lines.map((l: { remaining: number }) => l.remaining),
+      ).toEqual([0, 15_000]);
+      expect(detail.body.payments).toHaveLength(1);
+
+      const other = await enroll('Autre', cl['6e']);
+      const r2 = await http
+        .post(`${base()}/payments`)
+        .set(auth())
+        .send({ studentId: other, amount: 1_000 })
+        .expect(201);
+      expect(r2.body.receiptNumber).toBe(`REC-${YEAR}-000002`);
+    });
+
+    it('refuse un encaissement supérieur au reste à payer', async () => {
+      const res = await http
+        .post(`${base()}/payments`)
+        .set(auth())
+        .send({ studentId, amount: 20_000 })
+        .expect(400);
+      expect(res.body.message).toBe(
+        'Le montant dépasse le reste à payer (15 000 FCFA).',
+      );
+    });
+
+    it('deux encaissements simultanés ne dépassent jamais le dû', async () => {
+      const id = await enroll('Course', cl['5e']);
+      const res = await Promise.all(
+        [0, 1].map(() =>
+          http
+            .post(`${base()}/payments`)
+            .set(auth())
+            .send({ studentId: id, amount: 30_000 }),
+        ),
+      );
+      expect(res.map((r) => r.status).sort()).toEqual([201, 400]);
+    });
+
+    it('liste les soldes ; status=overdue contient l’élève', async () => {
+      const all = await http
+        .get(`${base()}/students?yearId=${yearId}`)
+        .set(auth())
+        .expect(200);
+      const me = all.body.find(
+        (b: { studentId: string }) => b.studentId === studentId,
+      );
+      expect(me).toMatchObject({
+        due: 40_000,
+        paid: 25_000,
+        remaining: 15_000,
+        overdue: true,
+      });
+      const od = await http
+        .get(`${base()}/students?status=overdue`)
+        .set(auth())
+        .expect(200);
+      expect(
+        od.body.some((b: { studentId: string }) => b.studentId === studentId),
+      ).toBe(true);
+      const paid = await http
+        .get(`${base()}/students?status=paid`)
+        .set(auth())
+        .expect(200);
+      expect(
+        paid.body.some((b: { studentId: string }) => b.studentId === studentId),
+      ).toBe(false);
+    });
+
+    it('reçu : données complètes', async () => {
+      const res = await http
+        .get(`${base()}/payments/${paymentId}/receipt`)
+        .set(auth())
+        .expect(200);
+      expect(res.body).toMatchObject({
+        number: `REC-${YEAR}-000001`,
+        amount: 25_000,
+        remaining: 15_000,
+        school: { name: 'Ecole std' },
+        student: { name: 'Caisse TEST' },
+        classroom: '5e A',
+      });
+    });
+
+    it('tableau de bord : totaux et en ligne', async () => {
+      const res = await http
+        .get(`${base()}/dashboard?yearId=${yearId}`)
+        .set(auth())
+        .expect(200);
+      expect(res.body.collected).toBeGreaterThanOrEqual(26_000);
+      expect(res.body.due).toBeGreaterThan(res.body.collected);
+      const b = res.body as {
+        due: number;
+        collected: number;
+        remaining: number;
+      };
+      expect(b.remaining).toBe(b.due - b.collected);
+      expect(res.body.online).toEqual({ collected: 0, available: 0 });
+      expect(Array.isArray(res.body.byClassroom)).toBe(true);
+    });
+
+    it('tableau de bord en Essentiel : 403 PLAN', async () => {
+      const e = await makeSchool('ess2', 'ESSENTIEL');
+      const res = await http
+        .get(`/schools/${e.school.id}/fees/dashboard`)
+        .set({ Authorization: `Bearer ${e.token}` })
+        .expect(403);
+      expect(JSON.stringify(res.body)).toContain('PLAN');
+    });
+
+    it('reçu d’une autre école : 404', async () => {
+      const o = await makeSchool('oth', 'STANDARD');
+      await http
+        .get(`/schools/${o.school.id}/fees/payments/${paymentId}/receipt`)
+        .set({ Authorization: `Bearer ${o.token}` })
+        .expect(404);
+    });
+  });
 });

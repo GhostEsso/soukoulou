@@ -45,3 +45,11 @@ export class ScheduleDto {
   @Type(() => LineDto)
   lines!: LineDto[];
 }
+
+export class CashDto {
+  @IsString() studentId!: string;
+  @IsInt({ message: 'Montant invalide.' })
+  @Min(1, { message: 'Montant invalide.' })
+  @Max(100_000_000, { message: 'Montant invalide.' })
+  amount!: number;
+}

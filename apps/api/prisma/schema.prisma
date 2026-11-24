@@ -776,6 +776,7 @@ model FeePayment {
 
   @@unique([schoolId, receiptNumber])
   @@index([schoolId, status])
+  @@index([studentFeeId])
 }
 
 /// Demande de décaissement.
