@@ -53,3 +53,10 @@ export class CashDto {
   @Max(100_000_000, { message: 'Montant invalide.' })
   amount!: number;
 }
+
+export class CheckoutDto {
+  @IsInt({ message: 'Montant invalide.' })
+  @Min(1, { message: 'Montant invalide.' })
+  @Max(100_000_000, { message: 'Montant invalide.' })
+  amount!: number;
+}

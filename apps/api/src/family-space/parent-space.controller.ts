@@ -8,6 +8,7 @@ import {
 import { AttendanceService } from '../attendance/attendance.service';
 import type { AuthUser } from '../auth/decorators';
 import { CurrentUser } from '../auth/decorators';
+import { CashboxService } from '../fees/cashbox.service';
 import { disciplineOf } from '../discipline/discipline.controller';
 import { GradesService } from '../grades/grades.service';
 import { PrismaService } from '../prisma/prisma.module';
@@ -25,6 +26,7 @@ export class ParentSpaceController {
     private readonly grades: GradesService,
     private readonly attendance: AttendanceService,
     private readonly schedule: ScheduleService,
+    private readonly cashbox: CashboxService,
   ) {}
 
   /** Le parent et ses enfants, avec leur classe de l'année en cours. */
@@ -80,7 +82,7 @@ export class ParentSpaceController {
     };
   }
 
-  /** Suivi d'un enfant : notes et moyennes par période, assiduité, emploi du temps de sa classe. */
+  /** Suivi d'un enfant : notes et moyennes par période, assiduité, emploi du temps de sa classe, frais de scolarité. */
   @Get('children/:studentId')
   async child(
     @CurrentUser() u: AuthUser,
@@ -90,14 +92,15 @@ export class ParentSpaceController {
     const home = await this.home(u, s);
     const child = home.children.find((c) => c.id === studentId);
     if (!child) throw new NotFoundException();
-    const [report, attendance, slots, discipline] = await Promise.all([
+    const [report, attendance, slots, discipline, fees] = await Promise.all([
       this.grades.studentReport(s, studentId),
       this.attendance.student(s, studentId),
       child.classroom
         ? this.schedule.list(s, { classroomId: child.classroom.id })
         : [],
       disciplineOf(this.prisma, s, studentId),
+      this.cashbox.studentFee(s, studentId),
     ]);
-    return { child, report, attendance, slots, discipline };
+    return { child, report, attendance, slots, discipline, fees };
   }
 }
