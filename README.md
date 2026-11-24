@@ -17,6 +17,7 @@
   - [Installation](#setup)
   - [Utilisation](#usage)
   - [Tests](#run-tests)
+  - [Déploiement](#deployment)
 - [👥 Auteur](#authors)
 - [🔭 Prochaines fonctionnalités](#future-features)
 - [📝 Licence](#license)
@@ -95,9 +96,8 @@ DATABASE_URL=postgresql://soukoulou:soukoulou@localhost:5433/soukoulou
 JWT_SECRET=une-longue-chaine-aleatoire
 PAYMENT_WEBHOOK_SECRET=une-autre-chaine-aleatoire
 WEB_URL=http://localhost:3000
-UPLOAD_DIR=./uploads
 
-# Stockage des photos (MinIO local)
+# Stockage des photos et pièces justificatives (MinIO local)
 S3_ENDPOINT=http://localhost:9000
 S3_ACCESS_KEY=soukoulou
 S3_SECRET_KEY=soukoulou-dev-secret
@@ -140,6 +140,26 @@ Les tests e2e utilisent une base dédiée `soukoulou_test` (créez-la une fois d
 docker compose exec db createdb -U soukoulou soukoulou_test
 pnpm test:api
 ```
+
+### Déploiement <a name="deployment"></a>
+
+Production gratuite, sans carte bancaire : web sur [Vercel](https://vercel.com/), API sur [Render](https://render.com/), PostgreSQL et fichiers (Object Storage, compatible S3) sur [Neon](https://neon.com/), à Francfort.
+
+1. **Neon** : `neon.ts` décrit les services (Postgres, bucket privé `soukoulou`). `npx neon@latest login` puis `npx neon@latest deploy` : les variables arrivent dans `.env.local` (jamais commité).
+2. **Secret partagé** : générer `API_SECRET` (`openssl rand -base64 32`). Il sert sur Render, Vercel et GitHub.
+3. **Render** : New → Blueprint → ce dépôt (`render.yaml`). `DATABASE_URL` = la valeur `DATABASE_URL_UNPOOLED` de Neon ; recopier les 4 variables `AWS_*`. Les migrations s'appliquent à chaque démarrage.
+4. **Vercel** : importer le dépôt, dossier racine `apps/web`, variables `API_URL` (URL Render) et `API_SECRET`. Reporter ensuite l'URL Vercel dans `WEB_URL` sur Render.
+5. **GitHub** (Settings → Secrets and variables → Actions) : variable `API_URL`, secret `API_SECRET`. La tâche quotidienne tourne alors à 6 h UTC (`.github/workflows/daily.yml`).
+6. **Données de base et compte admin**, une seule fois, depuis `apps/api` :
+   ```sh
+   DATABASE_URL="<DATABASE_URL_UNPOOLED>" SEED_ADMIN_EMAIL="<email>" SEED_ADMIN_PASSWORD="<mot de passe>" npx prisma db seed
+   ```
+
+Limites de l'offre gratuite : l'API se met en veille après 15 min sans visite (environ 1 min au réveil) ; Neon offre 5 Go de fichiers et 5 Go de transfert par mois ; Vercel limite les envois à 4,5 Mo.
+
+Sur un serveur à soi, `docker-compose.prod.yml` lance tout (web, API, PostgreSQL, MinIO) avec les variables de `prod.env.example` ; seul le web est exposé.
+
+<p align="right">(<a href="#readme-top">retour en haut</a>)</p>
 
 <p align="right">(<a href="#readme-top">retour en haut</a>)</p>
 

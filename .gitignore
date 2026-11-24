@@ -7,3 +7,6 @@ uploads
 .demo-login.txt
 .claude-flow
 .DS_Store
+prod.env
+.neon
+.env.local

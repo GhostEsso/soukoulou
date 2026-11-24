@@ -1,6 +1,7 @@
 import "server-only";
-import { cookies } from "next/headers";
+import { cookies, headers as nextHeaders } from "next/headers";
 import { redirect } from "next/navigation";
+import { apiHeaders } from "./api-headers";
 import { ACCESS_COOKIE } from "./session";
 
 export const API_URL = process.env.API_URL ?? "http://localhost:4000";
@@ -48,6 +49,7 @@ export async function api<T>(
     const token = (await cookies()).get(ACCESS_COOKIE)?.value;
     if (token) headers.set("Authorization", `Bearer ${token}`);
   }
+  for (const [k, v] of Object.entries(apiHeaders((await nextHeaders()).get("x-forwarded-for")))) headers.set(k, v);
 
   const res = await fetch(`${API_URL}${path}`, {
     ...rest,

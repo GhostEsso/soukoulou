@@ -20,7 +20,9 @@ import type { Readable } from 'node:stream';
 /**
  * Stockage de fichiers compatible S3 (MinIO en local, voir docker-compose).
  * Bucket privé : les fichiers passent toujours par l'API, qui vérifie les droits.
- * Variables : S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY, S3_BUCKET (défaut « soukoulou »), S3_REGION.
+ * Variables : S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY, S3_BUCKET (défaut « soukoulou »), S3_REGION,
+ * ou les noms standards AWS posés par Neon Object Storage (AWS_ENDPOINT_URL_S3, AWS_ACCESS_KEY_ID,
+ * AWS_SECRET_ACCESS_KEY, AWS_REGION).
  */
 @Injectable()
 export class StorageService {
@@ -35,16 +37,18 @@ export class StorageService {
 
   private s3() {
     if (this.client) return this.client;
-    const endpoint = this.config.get<string>('S3_ENDPOINT');
-    const accessKeyId = this.config.get<string>('S3_ACCESS_KEY');
-    const secretAccessKey = this.config.get<string>('S3_SECRET_KEY');
+    const env = (name: string, aws: string) =>
+      this.config.get<string>(name) ?? this.config.get<string>(aws);
+    const endpoint = env('S3_ENDPOINT', 'AWS_ENDPOINT_URL_S3');
+    const accessKeyId = env('S3_ACCESS_KEY', 'AWS_ACCESS_KEY_ID');
+    const secretAccessKey = env('S3_SECRET_KEY', 'AWS_SECRET_ACCESS_KEY');
     if (!endpoint || !accessKeyId || !secretAccessKey)
       throw new ServiceUnavailableException(
         'Le stockage des fichiers n’est pas configuré (S3_ENDPOINT, S3_ACCESS_KEY, S3_SECRET_KEY).',
       );
     this.client = new S3Client({
       endpoint,
-      region: this.config.get<string>('S3_REGION') ?? 'us-east-1',
+      region: env('S3_REGION', 'AWS_REGION') ?? 'us-east-1',
       credentials: { accessKeyId, secretAccessKey },
       forcePathStyle: true, // MinIO : http://hôte:9000/bucket/clé
     });
