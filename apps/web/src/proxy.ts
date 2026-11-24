@@ -7,6 +7,7 @@ import {
   refreshCookie,
   type Tokens,
 } from "@/lib/session";
+import { apiHeaders } from "@/lib/api-headers";
 
 const API_URL = process.env.API_URL ?? "http://localhost:4000";
 
@@ -26,7 +27,10 @@ export async function proxy(request: NextRequest) {
 
   const res = await fetch(`${API_URL}/auth/refresh`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...apiHeaders(request.headers.get("x-forwarded-for")),
+    },
     body: JSON.stringify({ refreshToken: refresh }),
   }).catch(() => null);
 

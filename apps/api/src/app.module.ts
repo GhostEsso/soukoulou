@@ -2,7 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
-import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { ThrottlerModule } from '@nestjs/throttler';
+import {
+  ApiSecretGuard,
+  ClientIpThrottlerGuard,
+} from './auth/api-secret.guard';
 import { AppController } from './app.controller';
 import { AnnouncementsModule } from './announcements/announcements.controller';
 import { StorageModule } from './storage/storage.module';
@@ -27,7 +31,6 @@ const REQUIRED_ENV = [
   'DATABASE_URL',
   'JWT_SECRET',
   'PAYMENT_WEBHOOK_SECRET',
-  'UPLOAD_DIR',
   'WEB_URL',
 ];
 
@@ -66,7 +69,8 @@ function validateEnv(env: Record<string, unknown>) {
   ],
   controllers: [AppController],
   providers: [
-    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_GUARD, useClass: ApiSecretGuard },
+    { provide: APP_GUARD, useClass: ClientIpThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
   ],
 })

@@ -1,0 +1,32 @@
+# API sur Render (offre gratuite) — Dashboard Render → New → Blueprint → ce dépôt.
+# Les valeurs « sync: false » sont demandées à la création (voir README, section Déploiement).
+services:
+  - type: web
+    name: soukoulou-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL # Neon, chaîne de connexion directe (sans « -pooler »)
+        sync: false
+      - key: WEB_URL # https://<projet>.vercel.app
+        sync: false
+      - key: API_SECRET # même valeur que sur Vercel et dans GitHub
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: PAYMENT_WEBHOOK_SECRET
+        generateValue: true
+      - key: S3_ENDPOINT # https://<ref>.storage.supabase.co/storage/v1/s3
+        sync: false
+      - key: S3_REGION # région du projet Supabase, ex. eu-west-3
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_BUCKET
+        value: soukoulou

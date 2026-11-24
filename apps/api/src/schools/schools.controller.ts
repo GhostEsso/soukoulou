@@ -4,6 +4,7 @@ import {
   Get,
   Headers,
   HttpCode,
+  NotFoundException,
   Param,
   Post,
   Put,
@@ -25,6 +26,7 @@ import {
   ThemeDto,
   UpgradeInfoDto,
 } from './dto';
+import { LifecycleService } from './lifecycle.service';
 import { OnboardingService } from './onboarding.service';
 
 const MAX_UPLOAD = 10 * 1_048_576;
@@ -34,7 +36,20 @@ export class SchoolsController {
   constructor(
     private readonly onboarding: OnboardingService,
     private readonly billing: BillingService,
+    private readonly lifecycle: LifecycleService,
   ) {}
+
+  /**
+   * Tâche quotidienne lancée de l'extérieur (GitHub Actions) quand l'API gratuite est en veille.
+   * Seulement si API_SECRET est défini : le garde ApiSecretGuard a alors vérifié le secret.
+   */
+  @Public()
+  @HttpCode(204)
+  @Post('internal/daily')
+  async daily() {
+    if (!process.env.API_SECRET) throw new NotFoundException();
+    await this.lifecycle.runDaily(new Date());
+  }
 
   @Public()
   @Get('public/plans')

@@ -1,0 +1,23 @@
+# L'API gratuite (Render) se met en veille : sa tâche quotidienne (fin du mode découverte,
+# échéances, vacances, rappels) est lancée d'ici. Variable API_URL et secret API_SECRET
+# à définir dans Settings → Secrets and variables → Actions.
+name: Tâche quotidienne
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  daily:
+    if: ${{ vars.API_URL != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Lancer la tâche quotidienne de l'API
+        env:
+          API_URL: ${{ vars.API_URL }}
+          API_SECRET: ${{ secrets.API_SECRET }}
+        # Réveil de l'API en veille : jusqu'à ~1 min, d'où les essais répétés.
+        run: >
+          curl -fsS --retry 4 --retry-delay 30 --retry-all-errors --max-time 120
+          -X POST -H "X-Api-Secret: $API_SECRET" "$API_URL/internal/daily"

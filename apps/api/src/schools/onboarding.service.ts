@@ -5,14 +5,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import type { Prisma } from '@prisma/client';
-import { createReadStream } from 'node:fs';
-import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { dirname, resolve } from 'node:path';
 import type { AuthUser } from '../auth/decorators';
 import { PrismaService } from '../prisma/prisma.module';
+import { StorageService } from '../storage/storage.module';
 import { UpgradeInfoDto } from './dto';
 import {
   checkAccess,
@@ -34,7 +31,7 @@ const EDITABLE_DOSSIER = ['NOT_SUBMITTED', 'CHANGES_REQUESTED'];
 export class OnboardingService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly config: ConfigService,
+    private readonly storage: StorageService,
   ) {}
 
   async assertSchoolAdmin(userId: string, schoolId: string) {
@@ -182,10 +179,9 @@ export class OnboardingService {
       );
     }
 
-    const fileKey = `${schoolId}/${randomUUID()}`;
-    const path = this.filePath(fileKey);
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, file.buffer);
+    // Clé toujours générée par le serveur, jamais fournie par l'utilisateur.
+    const fileKey = `documents/${schoolId}/${randomUUID()}`;
+    await this.storage.put(fileKey, file.buffer, mime);
 
     const data = {
       fileKey,
@@ -216,8 +212,7 @@ export class OnboardingService {
         data: { schoolId, type: 'DOCUMENT_UPLOADED' },
       });
     }
-    if (existing)
-      await unlink(this.filePath(existing.fileKey)).catch(() => undefined);
+    if (existing) await this.storage.remove(existing.fileKey);
     return this.overview(schoolId);
   }
 
@@ -258,7 +253,7 @@ export class OnboardingService {
     });
     if (!doc) throw new NotFoundException();
     return {
-      stream: createReadStream(this.filePath(doc.fileKey)),
+      stream: (await this.storage.get(doc.fileKey)).stream,
       mimeType: doc.mimeType,
       name: doc.originalName,
     };
@@ -302,10 +297,5 @@ export class OnboardingService {
       feature,
     );
     return { access: denial === null, denial };
-  }
-
-  private filePath(fileKey: string) {
-    // fileKey est toujours généré par le serveur, jamais fourni par l'utilisateur.
-    return resolve(this.config.getOrThrow<string>('UPLOAD_DIR'), fileKey);
   }
 }

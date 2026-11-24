@@ -1,5 +1,5 @@
-# Production sur une VM Oracle Cloud Always Free, déployée par Coolify (ressource « Docker Compose »).
-# Coolify expose le service web (port 3000) avec HTTPS ; l'API, la base et MinIO restent internes.
+# Production sur un serveur à soi (VPS, Coolify…) : tout tourne sur une machine.
+# Seul le service web (port 3000) est exposé, derrière le proxy HTTPS ; API, base et MinIO restent internes.
 # Sans Coolify : docker compose -f docker-compose.prod.yml --env-file prod.env up -d --build
 services:
   db:
@@ -42,16 +42,12 @@ services:
       JWT_SECRET: ${JWT_SECRET:?}
       PAYMENT_WEBHOOK_SECRET: ${PAYMENT_WEBHOOK_SECRET:?}
       WEB_URL: https://${DOMAIN:?}
-      UPLOAD_DIR: /data/uploads
       S3_ENDPOINT: http://minio:9000
       S3_ACCESS_KEY: soukoulou
       S3_SECRET_KEY: ${S3_SECRET_KEY}
       S3_BUCKET: soukoulou
-      TRUST_PROXY: "1"
       SEED_ADMIN_EMAIL: ${SEED_ADMIN_EMAIL:-}
       SEED_ADMIN_PASSWORD: ${SEED_ADMIN_PASSWORD:-}
-    volumes:
-      - uploads:/data/uploads
 
   web:
     build:
@@ -68,4 +64,3 @@ services:
 volumes:
   db-data:
   minio-data:
-  uploads:

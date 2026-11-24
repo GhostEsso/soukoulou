@@ -96,9 +96,8 @@ DATABASE_URL=postgresql://soukoulou:soukoulou@localhost:5433/soukoulou
 JWT_SECRET=une-longue-chaine-aleatoire
 PAYMENT_WEBHOOK_SECRET=une-autre-chaine-aleatoire
 WEB_URL=http://localhost:3000
-UPLOAD_DIR=./uploads
 
-# Stockage des photos (MinIO local)
+# Stockage des photos et pièces justificatives (MinIO local)
 S3_ENDPOINT=http://localhost:9000
 S3_ACCESS_KEY=soukoulou
 S3_SECRET_KEY=soukoulou-dev-secret
@@ -144,14 +143,22 @@ pnpm test:api
 
 ### Déploiement <a name="deployment"></a>
 
-Production gratuite : une VM [Oracle Cloud Always Free](https://www.oracle.com/cloud/free/) (ARM) avec [Coolify](https://coolify.io/).
+Production gratuite, sans carte bancaire : web sur [Vercel](https://vercel.com/), API sur [Render](https://render.com/), PostgreSQL sur [Neon](https://neon.com/), fichiers sur [Supabase Storage](https://supabase.com/) (compatible S3).
 
-1. Installer Coolify sur la VM : `curl -fsSL https://cdn.coollabs.io/coolify/install.sh | sudo bash`
-2. Dans Coolify, ajouter le dépôt GitHub en ressource **Docker Compose**, fichier `docker-compose.prod.yml`.
-3. Saisir les variables de `prod.env.example` et donner le domaine au service `web` (port 3000).
-4. Déployer, puis créer le compte admin une seule fois : `npx prisma db seed` dans le conteneur `api`.
+1. **Secret partagé** : générer `API_SECRET` (`openssl rand -base64 32`). Il sert sur Render, Vercel et GitHub.
+2. **Neon** : créer un projet, copier la chaîne de connexion **directe** (sans `-pooler`).
+3. **Supabase** : créer un projet, un bucket privé `soukoulou` (Storage), puis des clés S3 (Storage → S3 Connection) : endpoint, région, access key, secret key.
+4. **Render** : New → Blueprint → ce dépôt (`render.yaml`), saisir les variables. Les migrations s'appliquent à chaque démarrage.
+5. **Vercel** : importer le dépôt, dossier racine `apps/web`, variables `API_URL` (URL Render) et `API_SECRET`. Reporter ensuite l'URL Vercel dans `WEB_URL` sur Render.
+6. **GitHub** (Settings → Secrets and variables → Actions) : variable `API_URL`, secret `API_SECRET`. La tâche quotidienne tourne alors à 6 h UTC (`.github/workflows/daily.yml`).
+7. **Compte admin**, une seule fois, depuis `apps/api` :
+   ```sh
+   DATABASE_URL="<neon>" SEED_ADMIN_EMAIL="<email>" SEED_ADMIN_PASSWORD="<mot de passe>" npx prisma db seed
+   ```
 
-Seul le service web est exposé ; l'API, PostgreSQL et MinIO restent sur le réseau interne. Les migrations s'appliquent à chaque démarrage de l'API.
+Limites de l'offre gratuite : l'API se met en veille après 15 min sans visite (environ 1 min au réveil) ; un projet Supabase sans activité pendant une semaine est mis en pause (à relancer depuis son tableau de bord) ; Vercel limite les envois à 4,5 Mo.
+
+Sur un serveur à soi, `docker-compose.prod.yml` lance tout (web, API, PostgreSQL, MinIO) avec les variables de `prod.env.example` ; seul le web est exposé.
 
 <p align="right">(<a href="#readme-top">retour en haut</a>)</p>
 

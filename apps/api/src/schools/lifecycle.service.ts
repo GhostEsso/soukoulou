@@ -23,6 +23,9 @@ export class LifecycleService {
 
   @Cron('0 6 * * *')
   async cron() {
+    // API publique en veille (hébergement gratuit) : la tâche est lancée de l'extérieur
+    // (POST /internal/daily, GitHub Actions). On évite un double passage et des rappels en double.
+    if (process.env.API_SECRET) return;
     await this.runDaily(new Date());
   }
 
