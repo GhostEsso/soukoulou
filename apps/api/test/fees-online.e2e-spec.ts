@@ -236,9 +236,9 @@ describe('Frais de scolarité : paiement en ligne des parents (e2e)', () => {
       ).body.fees.canPay;
     expect(await canPay()).toBe(true);
     const env = process.env.NODE_ENV;
-    const prov = process.env.PAYMENT_PROVIDER;
+    const prov = process.env.SASPAY_API_KEY;
     process.env.NODE_ENV = 'production';
-    delete process.env.PAYMENT_PROVIDER;
+    delete process.env.SASPAY_API_KEY;
     try {
       expect(await canPay()).toBe(false);
       const res = await checkout(schoolId, f.studentId, f.auth, 1_000).expect(
@@ -248,12 +248,127 @@ describe('Frais de scolarité : paiement en ligne des parents (e2e)', () => {
         "Le paiement en ligne n'est pas encore disponible.",
       );
       expect(await prisma.feePayment.count({ where: { schoolId } })).toBe(0);
-      process.env.PAYMENT_PROVIDER = 'x';
+      process.env.SASPAY_API_KEY = 'x';
       expect(await canPay()).toBe(true);
     } finally {
       process.env.NODE_ENV = env;
-      if (prov === undefined) delete process.env.PAYMENT_PROVIDER;
-      else process.env.PAYMENT_PROVIDER = prov;
+      if (prov === undefined) delete process.env.SASPAY_API_KEY;
+      else process.env.SASPAY_API_KEY = prov;
+    }
+  });
+
+  it('SasPay : checkout hébergé, confirmation par verify (montant contrôlé), webhook signé', async () => {
+    const { schoolId, family } = await setup('saspay', 'STANDARD');
+    const f = await family('Afi');
+    const saved = {
+      key: process.env.SASPAY_API_KEY,
+      wh: process.env.SASPAY_WEBHOOK_SECRET,
+    };
+    process.env.SASPAY_API_KEY = 'sk_test_e2e';
+    process.env.SASPAY_WEBHOOK_SECRET = 'whsec_e2e';
+    const calls: { url: string; init?: RequestInit }[] = [];
+    let session = { status: 'PENDING', transaction_id: null as string | null };
+    let verified = {
+      status: 'SUCCESS',
+      net_amount: '9000.00',
+      currency: 'XOF',
+    };
+    const realFetch = global.fetch;
+    const json = (data: unknown, status = 200) =>
+      new Response(JSON.stringify({ success: true, data, code: status }), {
+        status,
+      });
+    global.fetch = jest.fn(
+      (input: string | URL | Request, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : input.toString();
+        if (!url.startsWith('https://sandbox-api.saspay.me/'))
+          return realFetch(input, init);
+        calls.push({ url, init });
+        if (url.endsWith('/checkout-sessions/'))
+          return Promise.resolve(
+            json(
+              {
+                id: 'sess_1',
+                checkout_url: 'https://sandbox-checkout.saspay.me/c/x',
+              },
+              201,
+            ),
+          );
+        if (url.endsWith('/checkout-sessions/sess_1/status/'))
+          return Promise.resolve(json(session));
+        if (url.endsWith('/payments/tx_1/verify/'))
+          return Promise.resolve(json(verified));
+        return Promise.resolve(json({}, 404));
+      },
+    ) as typeof fetch;
+    const refresh = (id: string) =>
+      http
+        .post(`/schools/${schoolId}/parent/fee-payments/${id}/refresh`)
+        .set(f.auth)
+        .expect(200);
+    try {
+      const res = await checkout(schoolId, f.studentId, f.auth, 10_000).expect(
+        201,
+      );
+      expect(res.body.checkoutUrl).toBe(
+        'https://sandbox-checkout.saspay.me/c/x',
+      );
+      const sent = JSON.parse(calls[0].init?.body as string) as Record<
+        string,
+        unknown
+      >;
+      expect(sent).toMatchObject({
+        amount: '10000.00',
+        currency: 'XOF',
+        fee_charge_mode: 'ADD_ON',
+      });
+      expect(
+        (calls[0].init?.headers as Record<string, string>).Authorization,
+      ).toBe('Bearer sk_test_e2e');
+      const id = res.body.paymentId as string;
+
+      // pas encore payé, puis montant net incohérent : reste en attente
+      expect((await refresh(id)).body.status).toBe('PENDING');
+      session = { status: 'PAID', transaction_id: 'tx_1' };
+      expect((await refresh(id)).body.status).toBe('PENDING');
+
+      // webhook : signature fausse ou trop vieille refusée ; valide déclenche la vérification
+      verified = { ...verified, net_amount: '10000.00' };
+      const body = JSON.stringify({
+        event: 'transaction.success',
+        data: { id: 'tx_1' },
+      });
+      const ts = String(Math.floor(Date.now() / 1000));
+      const sig = (t: string) =>
+        createHmac('sha256', 'whsec_e2e').update(`${t}.${body}`).digest('hex');
+      const hook = (t: string, s: string) =>
+        http
+          .post('/webhooks/saspay')
+          .set('Content-Type', 'application/json')
+          .set('X-Webhook-Timestamp', t)
+          .set('X-Webhook-Signature', s)
+          .send(body);
+      await hook(ts, sig('1')).expect(401);
+      await hook(
+        String(Number(ts) - 301),
+        sig(String(Number(ts) - 301)),
+      ).expect(401);
+      await hook(ts, sig(ts)).expect(200);
+      expect((await refresh(id)).body.status).toBe('PAID');
+      const after = await view(schoolId, f.studentId, f.auth);
+      expect(after.remaining).toBe(30_000);
+      expect(after.payments[0].receiptNumber).toMatch(/^REC-\d{4}-\d{6}$/);
+
+      // l'ancien webhook de simulation est fermé quand SasPay est configuré
+      await webhook(id, 'PAID').expect(404);
+    } finally {
+      global.fetch = realFetch;
+      for (const [k, v] of [
+        ['SASPAY_API_KEY', saved.key],
+        ['SASPAY_WEBHOOK_SECRET', saved.wh],
+      ] as const)
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
     }
   });
 

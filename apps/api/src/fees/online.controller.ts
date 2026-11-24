@@ -30,7 +30,30 @@ export class OnlineController {
     return this.online.checkout(s, u.id, studentId, dto.amount);
   }
 
-  /** Appelé par le prestataire de paiement. Signature HMAC du corps brut. */
+  /** Retour du parent depuis SasPay : vérifie son paiement. */
+  @HttpCode(200)
+  @Post('schools/:schoolId/parent/fee-payments/:paymentId/refresh')
+  refresh(
+    @CurrentUser() u: AuthUser,
+    @Param('schoolId') s: string,
+    @Param('paymentId') paymentId: string,
+  ) {
+    return this.online.refreshForParent(s, u.id, paymentId);
+  }
+
+  /** Webhook SasPay (transaction.*) : signature sur « horodatage.corps brut », âge ≤ 300 s. */
+  @Public()
+  @HttpCode(200)
+  @Post('webhooks/saspay')
+  saspayWebhook(
+    @Req() req: RawBodyRequest<Request>,
+    @Headers('x-webhook-signature') signature: string | undefined,
+    @Headers('x-webhook-timestamp') timestamp: string | undefined,
+  ) {
+    return this.online.handleSaspayWebhook(req.rawBody, signature, timestamp);
+  }
+
+  /** Développement sans SasPay : confirmation simulée. Signature HMAC du corps brut. */
   @Public()
   @HttpCode(200)
   @Post('webhooks/fee-payments')
