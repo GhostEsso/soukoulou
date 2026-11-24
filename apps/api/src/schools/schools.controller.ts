@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   Headers,
   HttpCode,
@@ -135,6 +137,37 @@ export class SchoolsController {
   ) {
     await this.onboarding.assertSchoolAdmin(user.id, schoolId);
     return this.onboarding.setTheme(schoolId, dto.brandColor);
+  }
+
+  @Put('schools/:schoolId/settings/logo')
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 2 * 1_048_576, files: 1 } }),
+  )
+  async setLogo(
+    @CurrentUser() user: AuthUser,
+    @Param('schoolId') schoolId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ) {
+    await this.onboarding.assertSchoolAdmin(user.id, schoolId);
+    if (!file)
+      throw new BadRequestException('Choisissez une image JPEG, PNG ou WebP.');
+    return this.onboarding.setLogo(schoolId, file);
+  }
+
+  @Delete('schools/:schoolId/settings/logo')
+  @HttpCode(204)
+  async removeLogo(
+    @CurrentUser() user: AuthUser,
+    @Param('schoolId') schoolId: string,
+  ) {
+    await this.onboarding.assertSchoolAdmin(user.id, schoolId);
+    await this.onboarding.setLogo(schoolId, null);
+  }
+
+  @Get('schools/:schoolId/logo')
+  async logo(@Param('schoolId') schoolId: string) {
+    const f = await this.onboarding.openLogo(schoolId);
+    return new StreamableFile(f.stream, { type: f.contentType });
   }
 
   @Post('schools/:schoolId/subscription/checkout')

@@ -35,7 +35,7 @@ export class StudentSpaceController {
         sex: true,
         matricule: true,
         photoKey: true,
-        school: { select: { name: true } },
+        school: { select: { name: true, logoKey: true } },
         enrollments: {
           where: { yearId: year?.id ?? '' },
           select: { classroom: { select: { id: true, name: true } } },
@@ -48,7 +48,7 @@ export class StudentSpaceController {
       );
     const { enrollments, school, photoKey, ...child } = st;
     return {
-      school,
+      school: { name: school.name, logo: photoVersion(school.logoKey) },
       child: {
         ...child,
         photo: photoVersion(photoKey),

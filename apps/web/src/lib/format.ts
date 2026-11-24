@@ -11,6 +11,9 @@ import type {
 export const money = (n: number, currency = "XOF") =>
   `${new Intl.NumberFormat("fr-FR").format(n)} ${currency === "XOF" ? "FCFA" : currency}`;
 
+/** URL du logo d'une école ; `v` change à chaque nouveau logo (cache long). */
+export const logoUrl = (schoolId: string, v: string | null) => (v ? `/photos/logo/${schoolId}?v=${v}` : null);
+
 export const date = (d: string | Date | null | undefined) =>
   d ? new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "long", year: "numeric" }).format(new Date(d)) : "—";
 

@@ -121,6 +121,7 @@ const schoolInitials = (name: string) => {
 export function AppShell({
   title,
   subtitle,
+  logo,
   groups,
   user,
   logoutAction,
@@ -130,6 +131,7 @@ export function AppShell({
 }: {
   title: string;
   subtitle?: string;
+  logo?: string | null;
   groups: { label?: string; items: NavItem[] }[];
   user: { name: string; email: string | null };
   logoutAction: () => Promise<void>;
@@ -158,12 +160,17 @@ export function AppShell({
           ) : (
             // Espace d'une école : son nom à la place de la marque.
             <Link href="/espace" className="flex min-w-0 items-center gap-2" title={subtitle ? `${title} · ${subtitle}` : title}>
-              <span
-                aria-hidden
-                className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary text-xs font-bold text-primary-foreground"
-              >
-                {schoolInitials(title)}
-              </span>
+              {logo ? (
+                // eslint-disable-next-line @next/next/no-img-element -- image privée relayée, pas d'optimisation
+                <img src={logo} alt="" className="size-7 shrink-0 rounded-lg object-contain" />
+              ) : (
+                <span
+                  aria-hidden
+                  className="grid size-7 shrink-0 place-items-center rounded-lg bg-primary text-xs font-bold text-primary-foreground"
+                >
+                  {schoolInitials(title)}
+                </span>
+              )}
               <span className="line-clamp-2 min-w-0 text-sm leading-tight font-semibold group-data-[collapsible=icon]:hidden">
                 {title}
               </span>

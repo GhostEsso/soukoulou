@@ -3,7 +3,7 @@ import { feedNotices } from "@/components/announcement-feed";
 import { AppShell } from "@/components/app-shell";
 import { ApiError } from "@/lib/api";
 import { getFeed, getMe, getTeacherHome } from "@/lib/data";
-import { todayLabel } from "@/lib/format";
+import { logoUrl, todayLabel } from "@/lib/format";
 import { logout } from "../../(auth)/actions";
 
 /** Espace enseignant : ses cours, l'appel et les notes de ses classes, rien d'autre. */
@@ -23,6 +23,7 @@ export default async function TeacherLayout({ children, params }: LayoutProps<"/
   return (
     <AppShell
       title={home.school.name}
+      logo={logoUrl(schoolId, home.school.logo)}
       subtitle="Espace enseignant"
       groups={[
         {

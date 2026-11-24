@@ -1,3 +1,4 @@
+import { photoVersion } from '../storage/storage.module';
 import {
   ForbiddenException,
   Injectable,
@@ -48,11 +49,15 @@ export class TeacherSpaceService {
     const [school, slots] = await Promise.all([
       this.prisma.school.findUniqueOrThrow({
         where: { id: schoolId },
-        select: { name: true },
+        select: { name: true, logoKey: true },
       }),
       this.schedule.list(schoolId, { teacherId: me.id }),
     ]);
-    return { ...me, school, slots };
+    return {
+      ...me,
+      school: { name: school.name, logo: photoVersion(school.logoKey) },
+      slots,
+    };
   }
 
   /** Refuse une classe (et matière si donnée) qu'il n'enseigne pas. */

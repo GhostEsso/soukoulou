@@ -4,6 +4,8 @@ import Link from "next/link";
 import { EmptyState, PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { getOnboarding } from "@/lib/data";
+import { logoUrl } from "@/lib/format";
+import { LogoForm } from "./logo-form";
 import { ThemeForm } from "./theme-form";
 
 export const metadata: Metadata = { title: "Apparence" };
@@ -17,8 +19,9 @@ export default async function AppearancePage({ params }: PageProps<"/ecole/[scho
     <>
       <PageHeader
         title="Apparence"
-        description="Le blanc reste la base. Choisissez la couleur d’accent de votre école : boutons, menu, liens."
+        description="Le logo de votre école et, avec Premium, sa couleur d’accent : boutons, menu, liens."
       />
+      <LogoForm schoolId={school.id} schoolName={school.name} logo={logoUrl(school.id, school.logo)} />
       {allowed ? (
         <ThemeForm schoolId={school.id} schoolName={school.name} current={school.brandColor} />
       ) : (

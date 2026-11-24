@@ -129,3 +129,15 @@ export async function setTheme(schoolId: string, brandColor: string | null): Pro
     brandColor ? "Couleur enregistrée." : "Couleur Soukoulou rétablie.",
   );
 }
+
+export async function uploadLogo(schoolId: string, form: FormData): Promise<ActionState> {
+  const file = form.get("file");
+  if (!(file instanceof File)) return { error: "Choisissez une image." };
+  const body = new FormData();
+  body.set("file", file);
+  return run(schoolId, () => api(path(schoolId, "/settings/logo"), { method: "PUT", body }), "Logo enregistré.");
+}
+
+export async function removeLogo(schoolId: string): Promise<ActionState> {
+  return run(schoolId, () => api(path(schoolId, "/settings/logo"), { method: "DELETE" }), "Logo retiré.");
+}

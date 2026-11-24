@@ -3,7 +3,7 @@ import { feedNotices } from "@/components/announcement-feed";
 import { AppShell } from "@/components/app-shell";
 import { ApiError } from "@/lib/api";
 import { getFeed, getMe, getStudentHome } from "@/lib/data";
-import { todayLabel } from "@/lib/format";
+import { logoUrl, todayLabel } from "@/lib/format";
 import { logout } from "../../(auth)/actions";
 
 /** Espace élève : son propre suivi, en lecture seule. */
@@ -22,6 +22,7 @@ export default async function StudentLayout({ children, params }: LayoutProps<"/
   return (
     <AppShell
       title={home.school.name}
+      logo={logoUrl(schoolId, home.school.logo)}
       subtitle="Espace élève"
       groups={[
         {

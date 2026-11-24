@@ -46,7 +46,7 @@ export class ParentSpaceController {
       select: {
         firstName: true,
         lastName: true,
-        school: { select: { name: true } },
+        school: { select: { name: true, logoKey: true } },
         children: {
           orderBy: { student: { firstName: 'asc' } },
           select: {
@@ -75,6 +75,7 @@ export class ParentSpaceController {
       );
     return {
       ...p,
+      school: { name: p.school.name, logo: photoVersion(p.school.logoKey) },
       children: p.children.map(
         ({ relation, student: { enrollments, photoKey, ...c } }) => ({
           ...c,
