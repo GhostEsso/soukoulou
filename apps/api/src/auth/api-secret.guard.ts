@@ -24,14 +24,20 @@ export function hasApiSecret(req: Request) {
 /**
  * API publique (hébergement séparé du web) : seul le serveur web, qui connaît API_SECRET,
  * peut l'appeler. Sans API_SECRET (dev, Docker Compose où l'API est interne), rien n'est exigé.
- * /health reste ouvert pour la sonde de l'hébergeur.
+ * /health reste ouvert pour la sonde de l'hébergeur ; /webhooks/* aussi : le prestataire de paiement
+ * ne peut pas porter le secret, ces routes vérifient leur propre signature HMAC.
  */
 @Injectable()
 export class ApiSecretGuard implements CanActivate {
   canActivate(ctx: ExecutionContext) {
     if (!process.env.API_SECRET) return true;
     const req = ctx.switchToHttp().getRequest<Request>();
-    if (req.path === '/health' || hasApiSecret(req)) return true;
+    if (
+      req.path === '/health' ||
+      req.path.startsWith('/webhooks/') ||
+      hasApiSecret(req)
+    )
+      return true;
     throw new ForbiddenException();
   }
 }

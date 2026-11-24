@@ -45,6 +45,15 @@ describe('API publique protégée par API_SECRET (e2e)', () => {
     await http.get('/auth/me').set('X-Api-Secret', SECRET).expect(401); // passe au contrôle du jeton
   });
 
+  it('webhooks du prestataire : exemptés du secret, protégés par leur signature (401, pas 403)', async () => {
+    for (const path of ['/webhooks/fee-payments', '/webhooks/payments'])
+      await http
+        .post(path)
+        .set('x-soukoulou-signature', 'deadbeef')
+        .send({ providerRef: 'x', status: 'PAID' })
+        .expect(401);
+  });
+
   it('tâche quotidienne déclenchable avec le secret seulement', async () => {
     await http.post('/internal/daily').expect(403);
     await http.post('/internal/daily').set('X-Api-Secret', SECRET).expect(204);
