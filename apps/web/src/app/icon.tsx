@@ -1,8 +1,11 @@
 import { ImageResponse } from "next/og";
+import { BRAND_BLUE, LogoMark } from "@/components/logo-mark";
 
-// Icône de l'app (même « S » que le composant Logo), servie en /icon/192 et /icon/512.
+// Icônes de l'app (marque du composant Logo) : /icon/32 pour l'onglet, /icon/192 et /icon/512 pour le manifeste.
+const SIZES = [32, 192, 512];
+
 export function generateImageMetadata() {
-  return [192, 512].map((size) => ({
+  return SIZES.map((size) => ({
     id: String(size),
     size: { width: size, height: size },
     contentType: "image/png",
@@ -11,6 +14,8 @@ export function generateImageMetadata() {
 
 export default async function Icon({ id }: { id: Promise<string> }) {
   const size = Number(await id);
+  // Onglet : carré arrondi entier. Manifeste : fond plein bord à bord (maskable), glyphe dans la zone sûre.
+  if (size <= 32) return new ImageResponse(<LogoMark size={size} radius={14} />, { width: size, height: size });
   return new ImageResponse(
     (
       <div
@@ -20,13 +25,10 @@ export default async function Icon({ id }: { id: Promise<string> }) {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#2346c8",
-          color: "#ffffff",
-          fontSize: size * 0.55,
-          fontWeight: 700,
+          background: BRAND_BLUE,
         }}
       >
-        S
+        <LogoMark size={size * 0.72} background="none" />
       </div>
     ),
     { width: size, height: size },
