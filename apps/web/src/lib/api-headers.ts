@@ -6,7 +6,9 @@
 export function apiHeaders(forwardedFor: string | null): Record<string, string> {
   const h: Record<string, string> = {};
   if (process.env.API_SECRET) h["X-Api-Secret"] = process.env.API_SECRET;
-  const ip = forwardedFor?.split(",")[0]?.trim();
+  // Dernière entrée : celle ajoutée par notre proxy (Vercel, Traefik, Caddy). Les premières
+  // peuvent venir du visiteur lui-même, qui contournerait alors la limite de connexions.
+  const ip = forwardedFor?.split(",").map((s) => s.trim()).filter(Boolean).at(-1);
   if (ip) h["X-Client-Ip"] = ip;
   return h;
 }
