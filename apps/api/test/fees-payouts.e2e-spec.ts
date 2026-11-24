@@ -212,6 +212,26 @@ describe('Frais de scolarité : décaissements (e2e)', () => {
     ).toBe(true);
   });
 
+  it('abonnement expiré : consultation et demande de décaissement permises', async () => {
+    const { schoolId, auth } = await setup('lapsed', 3_000);
+    await prisma.school.update({
+      where: { id: schoolId },
+      data: { subscriptionStatus: 'READ_ONLY' },
+    });
+    const list = await http
+      .get(`/schools/${schoolId}/fees/payouts`)
+      .set(auth)
+      .expect(200);
+    expect(list.body.available).toBe(3_000);
+    await ask(schoolId, auth, 3_000).expect(201);
+    await prisma.school.update({
+      where: { id: schoolId },
+      data: { subscriptionStatus: 'SUSPENDED' },
+    });
+    const suspended = await ask(schoolId, auth, 1).expect(403);
+    expect(suspended.body.message).toBe('SUSPENDED');
+  });
+
   it('validation et accès', async () => {
     const { schoolId, auth } = await setup('val', 10_000);
     await ask(schoolId, auth, 0).expect(400);

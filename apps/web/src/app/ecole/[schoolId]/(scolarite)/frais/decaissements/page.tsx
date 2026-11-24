@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { StatusBadge } from "@/components/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, ApiError } from "@/lib/api";
-import { getOnboarding, hasFeature } from "@/lib/data";
+import { getOnboarding } from "@/lib/data";
 import { dateTime, money, PAYOUT_STATUS } from "@/lib/format";
 import type { Payout } from "@/lib/types";
 import { Panel } from "../../../dashboard";
@@ -15,7 +15,6 @@ export default async function PayoutsPage({ params }: PageProps<"/ecole/[schoolI
   const { schoolId } = await params;
   const onboarding = await getOnboarding(schoolId);
   const denied = <PlanDenied schoolId={schoolId} title="Décaissements" />;
-  if (!hasFeature(onboarding, "fee_payments")) return denied;
   const base = `/schools/${encodeURIComponent(schoolId)}/fees`;
   const data = await api<{ available: number; items: Payout[] }>(`${base}/payouts`).catch((e) => {
     if (e instanceof ApiError && e.status === 403) return null;
@@ -23,7 +22,7 @@ export default async function PayoutsPage({ params }: PageProps<"/ecole/[schoolI
   });
   if (!data) return denied;
   const { available, items: payouts } = data;
-  const canRequest = onboarding.access.collect === null;
+  const canRequest = onboarding.access.payout === null;
 
   return (
     <div className="space-y-6">

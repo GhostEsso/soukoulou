@@ -33,9 +33,11 @@ export const ALL_FEATURES = Object.values(FEATURES) as string[];
  * - write : saisir ou modifier des données de l'école ;
  * - publish : rendre visible aux élèves et parents, envoyer des messages ;
  * - invite : inviter enseignants, élèves, parents ;
- * - collect : encaisser les frais de scolarité.
+ * - collect : encaisser les frais de scolarité ;
+ * - payout : demander le décaissement de l'argent déjà encaissé (permis même abonnement expiré).
  */
-export type Need = 'read' | 'write' | 'publish' | 'invite' | 'collect';
+export type Need =
+  'read' | 'write' | 'publish' | 'invite' | 'collect' | 'payout';
 
 export type Denial =
   | 'DISCOVERY'
@@ -59,6 +61,11 @@ export function checkAccess(
   feature: string = FEATURES.CORE,
 ): Denial | null {
   if (s.subscriptionStatus === 'SUSPENDED') return 'SUSPENDED';
+  // L'argent des parents appartient à l'école : ni l'abonnement ni l'offre ne bloquent son décaissement.
+  if (need === 'payout') {
+    if (s.verificationStatus !== 'VERIFIED') return 'NOT_VERIFIED';
+    return s.hasOverdueDocument ? 'DOCUMENT_OVERDUE' : null;
+  }
   if (s.subscriptionStatus === 'DISCOVERY') return 'DISCOVERY';
   if (s.subscriptionStatus === 'READ_ONLY') {
     return need === 'read' ? null : 'READ_ONLY';

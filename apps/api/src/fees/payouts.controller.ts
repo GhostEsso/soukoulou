@@ -11,7 +11,6 @@ import {
 import type { AuthUser } from '../auth/decorators';
 import { CurrentUser, PlatformAdminOnly } from '../auth/decorators';
 import { OnboardingService } from '../schools/onboarding.service';
-import { FEATURES } from '../schools/rules';
 import { ListPayoutsQuery, PaidDto, PayoutDto, RejectDto } from './dto';
 import { PayoutsService } from './payouts.service';
 
@@ -22,23 +21,10 @@ export class PayoutsController {
     private readonly onboarding: OnboardingService,
   ) {}
 
-  private async school(
-    userId: string,
-    schoolId: string,
-    action: 'read' | 'collect',
-  ) {
-    await this.onboarding.assertSchoolAdmin(userId, schoolId);
-    const { access, denial } = await this.onboarding.can(
-      schoolId,
-      action,
-      FEATURES.FEE_PAYMENTS,
-    );
-    if (!access) throw new ForbiddenException(denial);
-  }
-
   @Get('schools/:schoolId/fees/payouts')
   async list(@CurrentUser() u: AuthUser, @Param('schoolId') s: string) {
-    await this.school(u.id, s, 'read');
+    // Consultable quel que soit l'abonnement ou l'offre : l'argent encaissé reste visible.
+    await this.onboarding.assertSchoolAdmin(u.id, s);
     return this.payouts.listPayouts(s);
   }
 
@@ -48,7 +34,9 @@ export class PayoutsController {
     @Param('schoolId') s: string,
     @Body() dto: PayoutDto,
   ) {
-    await this.school(u.id, s, 'collect');
+    await this.onboarding.assertSchoolAdmin(u.id, s);
+    const { access, denial } = await this.onboarding.can(s, 'payout');
+    if (!access) throw new ForbiddenException(denial);
     return this.payouts.requestPayout(s, u.id, dto);
   }
 

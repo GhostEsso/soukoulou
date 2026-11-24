@@ -24,7 +24,14 @@ import {
 
 type SchoolWithDocs = Prisma.SchoolGetPayload<{ include: { documents: true } }>;
 
-const NEEDS: Need[] = ['read', 'write', 'publish', 'invite', 'collect'];
+const NEEDS: Need[] = [
+  'read',
+  'write',
+  'publish',
+  'invite',
+  'collect',
+  'payout',
+];
 const EDITABLE_DOSSIER = ['NOT_SUBMITTED', 'CHANGES_REQUESTED'];
 
 @Injectable()

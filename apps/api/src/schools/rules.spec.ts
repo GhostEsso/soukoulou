@@ -49,6 +49,21 @@ describe('checkAccess', () => {
     expect(checkAccess(s, 'invite')).toBe('DOCUMENT_OVERDUE');
     expect(checkAccess(s, 'collect')).toBe('DOCUMENT_OVERDUE');
   });
+
+  it('décaissement : permis abonnement expiré ou hors offre, pas suspendu ni non vérifié', () => {
+    const lapsed = { ...active, subscriptionStatus: 'READ_ONLY' as const };
+    expect(checkAccess(lapsed, 'payout')).toBeNull();
+    expect(checkAccess({ ...active, planFeatures: [] }, 'payout')).toBeNull();
+    expect(
+      checkAccess({ ...active, subscriptionStatus: 'SUSPENDED' }, 'payout'),
+    ).toBe('SUSPENDED');
+    expect(
+      checkAccess({ ...active, verificationStatus: 'PENDING' }, 'payout'),
+    ).toBe('NOT_VERIFIED');
+    expect(checkAccess({ ...active, hasOverdueDocument: true }, 'payout')).toBe(
+      'DOCUMENT_OVERDUE',
+    );
+  });
 });
 
 describe('requirementApplies / isOverdue', () => {

@@ -12,7 +12,7 @@ export type SchoolType = "PRIMARY" | "MIDDLE" | "HIGH" | "COMPLEX" | "INSTITUTE"
 export type Ownership = "PUBLIC" | "PRIVATE_SECULAR" | "PRIVATE_FAITH";
 export type BillingCycle = "MONTHLY" | "SCHOOL_YEAR";
 export type PaymentMethod = "MOBILE_MONEY" | "CARD" | "TRANSFER";
-export type Need = "read" | "write" | "publish" | "invite" | "collect";
+export type Need = "read" | "write" | "publish" | "invite" | "collect" | "payout";
 export type Denial =
   | "DISCOVERY"
   | "SUSPENDED"
