@@ -620,9 +620,12 @@ export interface FeeReceipt {
   school: { name: string };
   student: { name: string };
   classroom: string | null;
+  payer: string | null;
+  payerRole: "parent" | "cashier" | null;
   amount: number;
   method: FeeMethod;
   paidAt: string;
+  due: number;
   remaining: number;
 }
 

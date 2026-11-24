@@ -215,9 +215,15 @@ export class CashboxService {
     });
   }
 
-  async receipt(schoolId: string, paymentId: string) {
+  /** Reçu d'un paiement PAID ; `studentId` restreint au paiement d'un élève (espace parent). */
+  async receipt(schoolId: string, paymentId: string, studentId?: string) {
     const p = await this.prisma.feePayment.findFirst({
-      where: { id: paymentId, schoolId, status: 'PAID' },
+      where: {
+        id: paymentId,
+        schoolId,
+        status: 'PAID',
+        ...(studentId && { studentFee: { studentId } }),
+      },
       include: {
         school: { select: { name: true } },
         studentFee: {
@@ -231,21 +237,48 @@ export class CashboxService {
     });
     if (!p) throw new NotFoundException('Reçu introuvable.');
     const f = p.studentFee;
-    const enrollment = await this.prisma.enrollment.findFirst({
-      where: { studentId: f.studentId, yearId: f.yearId },
-      select: { classroom: { select: { name: true } } },
-    });
+    const [enrollment, parent, cashier] = await Promise.all([
+      this.prisma.enrollment.findFirst({
+        where: { studentId: f.studentId, yearId: f.yearId },
+        select: { classroom: { select: { name: true } } },
+      }),
+      p.parentId
+        ? this.prisma.parent.findFirst({
+            where: { id: p.parentId, schoolId },
+            select: { firstName: true, lastName: true },
+          })
+        : null,
+      p.recordedById
+        ? this.prisma.user.findUnique({
+            where: { id: p.recordedById },
+            select: { firstName: true, lastName: true },
+          })
+        : null,
+    ]);
     const due = f.lines.reduce((s, l) => s + l.amount, 0);
-    const paid = f.payments.reduce((s, x) => s + x.amount, 0);
+    // Reste juste après ce paiement : un reçu réimprimé plus tard reste identique.
+    const at = (x: { paidAt: Date | null; id: string }) =>
+      [x.paidAt?.getTime() ?? 0, x.id] as const;
+    const upTo = f.payments
+      .filter((x) => {
+        const [a, ai] = at(x);
+        const [b, bi] = at(p);
+        return a < b || (a === b && ai <= bi);
+      })
+      .reduce((s, x) => s + x.amount, 0);
+    const who = parent ?? cashier;
     return {
       number: p.receiptNumber,
       school: { name: p.school.name },
       student: { name: `${f.student.firstName} ${f.student.lastName}` },
       classroom: enrollment?.classroom.name ?? null,
+      payer: who ? `${who.firstName} ${who.lastName}` : null,
+      payerRole: parent ? 'parent' : cashier ? 'cashier' : null,
       amount: p.amount,
       method: p.method,
       paidAt: p.paidAt,
-      remaining: due - paid,
+      due,
+      remaining: due - upTo,
     };
   }
 
