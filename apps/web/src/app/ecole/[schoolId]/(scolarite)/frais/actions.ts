@@ -53,6 +53,10 @@ export async function deleteSchedule(schoolId: string, scheduleId: string, _?: A
   return run(schoolId, () => api(fees(schoolId, `/schedules/${id(scheduleId)}`), { method: "DELETE" }), "Règle supprimée.");
 }
 
+export async function reapplySchedule(schoolId: string, scheduleId: string, _?: ActionState): Promise<ActionState> {
+  return run(schoolId, () => api(fees(schoolId, `/schedules/${id(scheduleId)}/reapply`), { method: "POST" }), "Élèves sans paiement recalculés.");
+}
+
 /** Encaissement en espèces : renvoie l'identifiant du paiement pour ouvrir le reçu. */
 export async function collectCash(schoolId: string, studentId: string, _: ActionState, form: FormData): Promise<ActionState> {
   let paymentId = "";

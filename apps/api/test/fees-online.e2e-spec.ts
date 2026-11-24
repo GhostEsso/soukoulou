@@ -224,6 +224,39 @@ describe('Frais de scolarité : paiement en ligne des parents (e2e)', () => {
     expect(school.receiptSeq).toBe(1);
   });
 
+  it('canPay vrai hors production ; en production sans prestataire : canPay faux et checkout 503', async () => {
+    const { schoolId, family } = await setup('prov', 'STANDARD');
+    const f = await family('Edem');
+    const canPay = async () =>
+      (
+        await http
+          .get(`/schools/${schoolId}/parent/children/${f.studentId}`)
+          .set(f.auth)
+          .expect(200)
+      ).body.fees.canPay;
+    expect(await canPay()).toBe(true);
+    const env = process.env.NODE_ENV;
+    const prov = process.env.PAYMENT_PROVIDER;
+    process.env.NODE_ENV = 'production';
+    delete process.env.PAYMENT_PROVIDER;
+    try {
+      expect(await canPay()).toBe(false);
+      const res = await checkout(schoolId, f.studentId, f.auth, 1_000).expect(
+        503,
+      );
+      expect(res.body.message).toBe(
+        "Le paiement en ligne n'est pas encore disponible.",
+      );
+      expect(await prisma.feePayment.count({ where: { schoolId } })).toBe(0);
+      process.env.PAYMENT_PROVIDER = 'x';
+      expect(await canPay()).toBe(true);
+    } finally {
+      process.env.NODE_ENV = env;
+      if (prov === undefined) delete process.env.PAYMENT_PROVIDER;
+      else process.env.PAYMENT_PROVIDER = prov;
+    }
+  });
+
   it('webhook : mauvaise signature 401, référence inconnue 404, FAILED sans effet sur le solde', async () => {
     const { schoolId, family } = await setup('web', 'STANDARD');
     const f = await family('Yao');

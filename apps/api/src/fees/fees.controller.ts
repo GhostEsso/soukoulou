@@ -67,6 +67,17 @@ export class FeesController {
     return this.fees.updateSchedule(s, id, dto);
   }
 
+  @Post(':id/reapply')
+  @HttpCode(200)
+  async reapply(
+    @CurrentUser() u: AuthUser,
+    @Param('schoolId') s: string,
+    @Param('id') id: string,
+  ) {
+    await this.admin(u.id, s, true);
+    return this.fees.reapplySchedule(s, id);
+  }
+
   @Delete(':id')
   @HttpCode(204)
   async remove(

@@ -9,6 +9,9 @@ import { AttendanceService } from '../attendance/attendance.service';
 import type { AuthUser } from '../auth/decorators';
 import { CurrentUser } from '../auth/decorators';
 import { CashboxService } from '../fees/cashbox.service';
+import { onlinePaymentReady } from '../fees/online.service';
+import { OnboardingService } from '../schools/onboarding.service';
+import { FEATURES } from '../schools/rules';
 import { disciplineOf } from '../discipline/discipline.controller';
 import { GradesService } from '../grades/grades.service';
 import { PrismaService } from '../prisma/prisma.module';
@@ -27,6 +30,7 @@ export class ParentSpaceController {
     private readonly attendance: AttendanceService,
     private readonly schedule: ScheduleService,
     private readonly cashbox: CashboxService,
+    private readonly onboarding: OnboardingService,
   ) {}
 
   /** Le parent et ses enfants, avec leur classe de l'année en cours. */
@@ -101,6 +105,17 @@ export class ParentSpaceController {
       disciplineOf(this.prisma, s, studentId),
       this.cashbox.studentFee(s, studentId),
     ]);
-    return { child, report, attendance, slots, discipline, fees };
+    const canPay =
+      !!fees &&
+      (await this.onboarding.can(s, 'collect', FEATURES.FEE_PAYMENTS)).access &&
+      onlinePaymentReady();
+    return {
+      child,
+      report,
+      attendance,
+      slots,
+      discipline,
+      fees: fees && { ...fees, canPay },
+    };
   }
 }

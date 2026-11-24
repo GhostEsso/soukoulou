@@ -153,6 +153,16 @@ export class FeesService {
     return s;
   }
 
+  /** Recalcule les élèves de la règle sans aucun paiement (tout statut) ; les autres gardent leur montant. */
+  async reapplySchedule(schoolId: string, id: string) {
+    const { yearId } = await this.own(schoolId, id);
+    await this.prisma.studentFee.deleteMany({
+      where: { schoolId, scheduleId: id, payments: { none: {} } },
+    });
+    const { created } = await this.applySchedules(schoolId, yearId);
+    return { recomputed: created };
+  }
+
   /** Fige le dû des élèves inscrits qui n'en ont pas encore ; ne modifie jamais un dû existant. */
   async applySchedules(
     schoolId: string,

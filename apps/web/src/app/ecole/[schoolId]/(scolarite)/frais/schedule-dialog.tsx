@@ -1,13 +1,13 @@
 "use client";
 
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Field, SelectField } from "@/components/form";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { FeeSchedule } from "@/lib/types";
 import { EditDialog } from "../dialogs";
-import { createSchedule, deleteSchedule, updateSchedule } from "./actions";
+import { createSchedule, deleteSchedule, reapplySchedule, updateSchedule } from "./actions";
 
 type Level = { id: string; name: string };
 type Row = { amount: string; dueOn: string };
@@ -100,6 +100,7 @@ export function ScheduleActions({ schoolId, yearId, schedule, levels, multi }: {
     <div className="flex justify-end gap-1">
       <EditDialog
         title="Modifier la règle"
+        description="Les élèves ayant déjà un dû le gardent. Pour l’appliquer à ceux qui n’ont encore rien payé, utilisez « Recalculer »."
         action={updateSchedule.bind(null, schoolId, yearId, schedule.id)}
         trigger={
           <Button size="icon" variant="ghost" aria-label="Modifier la règle">
@@ -108,6 +109,19 @@ export function ScheduleActions({ schoolId, yearId, schedule, levels, multi }: {
         }
       >
         {(v) => <Form levels={levels} schedule={schedule} multi={multi} v={v} />}
+      </EditDialog>
+      <EditDialog
+        title="Recalculer les élèves sans paiement ?"
+        description="Le dû des élèves de cette règle qui n’ont aucun paiement est recalculé avec les montants actuels. Ceux qui ont payé gardent leur montant."
+        action={reapplySchedule.bind(null, schoolId, schedule.id)}
+        submitLabel="Recalculer"
+        trigger={
+          <Button size="icon" variant="ghost" aria-label="Recalculer les élèves sans paiement">
+            <RotateCw aria-hidden />
+          </Button>
+        }
+      >
+        {() => null}
       </EditDialog>
       <EditDialog
         title="Supprimer cette règle ?"

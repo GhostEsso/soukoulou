@@ -4,6 +4,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +14,10 @@ import { OnboardingService } from '../schools/onboarding.service';
 import type { PaymentWebhookDto } from '../schools/dto';
 import { FEATURES } from '../schools/rules';
 import { assignReceipt, CashboxService, fmt } from './cashbox.service';
+
+/** En production, le paiement en ligne n'ouvre qu'avec un prestataire configuré. */
+export const onlinePaymentReady = () =>
+  process.env.NODE_ENV !== 'production' || !!process.env.PAYMENT_PROVIDER;
 
 /** Paiement en ligne des frais par le parent : ouverture du paiement, puis confirmation du prestataire. */
 @Injectable()
@@ -32,6 +37,10 @@ export class OnlineService {
     studentId: string,
     amount: number,
   ) {
+    if (!onlinePaymentReady())
+      throw new ServiceUnavailableException(
+        "Le paiement en ligne n'est pas encore disponible.",
+      );
     const parent = await this.prisma.parent.findFirst({
       where: {
         schoolId,

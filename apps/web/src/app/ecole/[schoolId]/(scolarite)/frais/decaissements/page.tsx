@@ -4,7 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { api, ApiError } from "@/lib/api";
 import { getOnboarding, hasFeature } from "@/lib/data";
 import { dateTime, money, PAYOUT_STATUS } from "@/lib/format";
-import type { FeeDashboard, Payout } from "@/lib/types";
+import type { Payout } from "@/lib/types";
 import { Panel } from "../../../dashboard";
 import { PlanDenied } from "../plan-denied";
 import { PayoutForm } from "./payout-form";
@@ -17,21 +17,21 @@ export default async function PayoutsPage({ params }: PageProps<"/ecole/[schoolI
   const denied = <PlanDenied schoolId={schoolId} title="Décaissements" />;
   if (!hasFeature(onboarding, "fee_payments")) return denied;
   const base = `/schools/${encodeURIComponent(schoolId)}/fees`;
-  const data = await Promise.all([api<Payout[]>(`${base}/payouts`), api<FeeDashboard>(`${base}/dashboard`)]).catch((e) => {
+  const data = await api<{ available: number; items: Payout[] }>(`${base}/payouts`).catch((e) => {
     if (e instanceof ApiError && e.status === 403) return null;
     throw e;
   });
   if (!data) return denied;
-  const [payouts, dash] = data;
+  const { available, items: payouts } = data;
   const canRequest = onboarding.access.collect === null;
 
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold tracking-tight">Décaissements</h1>
       <Panel title="Disponible">
-        <p className="mb-4 text-2xl font-semibold tabular-nums">{money(dash.online.available)}</p>
+        <p className="mb-4 text-2xl font-semibold tabular-nums">{money(available)}</p>
         {canRequest ? (
-          <PayoutForm schoolId={schoolId} available={dash.online.available} />
+          <PayoutForm schoolId={schoolId} available={available} />
         ) : (
           <p className="text-sm text-muted-foreground">Les demandes sont indisponibles tant que votre dossier n’est pas validé et à jour.</p>
         )}

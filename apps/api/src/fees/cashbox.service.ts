@@ -35,11 +35,9 @@ export async function assignReceipt(
   paymentId: string,
   at: Date,
 ): Promise<string> {
-  const { receiptSeq } = await tx.school.update({
-    where: { id: schoolId },
-    data: { receiptSeq: { increment: 1 } },
-    select: { receiptSeq: true },
-  });
+  // SQL brut : un update Prisma ferait avancer School.updatedAt (file de vérification de la plateforme).
+  const [{ receiptSeq }] = await tx.$queryRaw<{ receiptSeq: number }[]>`
+    UPDATE "School" SET "receiptSeq" = "receiptSeq" + 1 WHERE id = ${schoolId} RETURNING "receiptSeq"`;
   const number = receiptNumber(at.getUTCFullYear(), receiptSeq);
   await tx.feePayment.update({
     where: { id: paymentId },

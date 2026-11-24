@@ -62,11 +62,15 @@ export class PayoutsService {
     }
   }
 
-  listPayouts(schoolId: string) {
-    return this.prisma.payout.findMany({
-      where: { schoolId },
-      orderBy: { createdAt: 'desc' },
-    });
+  async listPayouts(schoolId: string) {
+    const [online, items] = await Promise.all([
+      onlineCollected(this.prisma, schoolId),
+      this.prisma.payout.findMany({
+        where: { schoolId },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+    return { available: availableForPayout(online, items), items };
   }
 
   listAll(status?: PayoutStatus) {

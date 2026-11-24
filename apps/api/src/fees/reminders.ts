@@ -28,6 +28,7 @@ export async function sendFeeReminders(
     },
     select: {
       id: true,
+      createdAt: true,
       school: { select: { name: true } },
       student: {
         select: {
@@ -45,7 +46,11 @@ export async function sendFeeReminders(
   for (const f of fees) {
     const paid = f.payments.reduce((s, p) => s + p.amount, 0);
     const alloc = allocate(f.lines, paid, now);
+    const created = f.createdAt.toISOString().slice(0, 10);
     for (const r of remindersDue(alloc, now)) {
+      // Tranche déjà échue à la création du dû : paiements antérieurs inconnus, pas de relance.
+      const due = alloc.find((x) => x.position === r.position)!.dueOn;
+      if (due.toISOString().slice(0, 10) < created) continue;
       const ins = await prisma.feeReminder.createMany({
         data: [{ studentFeeId: f.id, position: r.position, kind: r.kind }],
         skipDuplicates: true,

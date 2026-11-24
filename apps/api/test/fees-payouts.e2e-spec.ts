@@ -157,8 +157,9 @@ describe('Frais de scolarité : décaissements (e2e)', () => {
       .get(`/schools/${schoolId}/fees/payouts`)
       .set(auth)
       .expect(200);
-    expect(mine.body).toHaveLength(2);
-    expect(mine.body[0].amount).toBe(4_000); // plus récente d'abord
+    expect(mine.body.items).toHaveLength(2);
+    expect(mine.body.available).toBe(0); // 10 000 - 6 000 - 4 000 demandés
+    expect(mine.body.items[0].amount).toBe(4_000); // plus récente d'abord
 
     // rejet de la 1re : 6 000 de nouveau disponibles
     await http

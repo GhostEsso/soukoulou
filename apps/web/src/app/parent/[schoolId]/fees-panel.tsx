@@ -15,8 +15,11 @@ export function FeesPanel({ schoolId, studentId, fees, dev }: { schoolId: string
   const due = fees.lines.reduce((n, l) => n + l.amount, 0);
   const remaining = due - fees.lines.reduce((n, l) => n + l.paid, 0);
   const next = fees.lines.find((l) => l.remaining > 0);
-  const [state, action] = useActionState<ActionState, FormData>(startFeePayment.bind(null, schoolId, studentId), undefined);
   const [sim, setSim] = useState<ActionState>();
+  const [state, action] = useActionState<ActionState, FormData>((prev, form) => {
+    setSim(undefined); // nouveau paiement : l'ancienne simulation ne doit pas masquer son attente
+    return startFeePayment(schoolId, studentId, prev, form);
+  }, undefined);
   const [simulating, start] = useTransition();
   const ref = state?.ok ? state.values?.providerRef : undefined;
 
@@ -37,7 +40,7 @@ export function FeesPanel({ schoolId, studentId, fees, dev }: { schoolId: string
         ))}
       </ul>
 
-      {remaining > 0 && (!ref || sim?.ok) && (
+      {remaining > 0 && fees.canPay && (!ref || sim?.ok) && (
         // key : la saisie reprend le reste de la tranche en cours après chaque changement de solde.
         <form key={`${next?.position}-${remaining}`} action={action} className="grid gap-3">
           <FormMessage state={state} />
@@ -47,6 +50,7 @@ export function FeesPanel({ schoolId, studentId, fees, dev }: { schoolId: string
           </SubmitButton>
         </form>
       )}
+      {remaining > 0 && !fees.canPay && <p className="text-sm text-muted-foreground">Paiement en ligne bientôt disponible : réglez à la caisse de l’école.</p>}
       {ref && !sim?.ok && (
         <div className="space-y-3 rounded-lg border bg-muted/40 p-3 text-sm">
           <p className="font-medium">Paiement en attente de confirmation</p>

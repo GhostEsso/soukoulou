@@ -588,6 +588,8 @@ export interface FeePaymentRow {
 
 export interface ChildFees {
   label: string;
+  /** Espace parent : paiement en ligne ouvert (offre de l'école et prestataire configuré). */
+  canPay?: boolean;
   lines: FeeLine[];
   payments: FeePaymentRow[];
 }

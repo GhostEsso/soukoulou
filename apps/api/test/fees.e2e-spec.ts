@@ -211,6 +211,79 @@ describe('Frais de scolarité : grille et montants figés (e2e)', () => {
     expect(total(await feeOf(id))).toBe(50_000);
   });
 
+  it('recalculer : seuls les dus sans paiement suivent la règle', async () => {
+    const r = await http
+      .post(`/schools/${schoolId}/fees/schedules`)
+      .set(auth())
+      .send(rule([lv['6e']], lines(10_000)))
+      .expect(201);
+    const free = await enroll('Libre', cl['6e']);
+    const paid = await enroll('Paye', cl['6e']);
+    const fee = await feeOf(paid);
+    await prisma.feePayment.create({
+      data: {
+        schoolId,
+        studentFeeId: fee!.id,
+        amount: 1_000,
+        method: 'CASH',
+        status: 'FAILED',
+      },
+    });
+    await http
+      .patch(`/schools/${schoolId}/fees/schedules/${r.body.id}`)
+      .set(auth())
+      .send(rule([lv['6e']], lines(15_000)))
+      .expect(200);
+    expect(total(await feeOf(free))).toBe(10_000);
+    const res = await http
+      .post(`/schools/${schoolId}/fees/schedules/${r.body.id}/reapply`)
+      .set(auth())
+      .expect(200);
+    expect(res.body.recomputed).toBeGreaterThanOrEqual(1);
+    expect(total(await feeOf(free))).toBe(15_000);
+    expect(total(await feeOf(paid))).toBe(10_000); // un paiement, même échoué : dû gardé
+    await http
+      .delete(`/schools/${schoolId}/fees/schedules/${r.body.id}`)
+      .set(auth())
+      .expect(204);
+  });
+
+  it('supprimer un élève ayant des paiements : 409 ; sans paiement : 204', async () => {
+    const r = await http
+      .post(`/schools/${schoolId}/fees/schedules`)
+      .set(auth())
+      .send(rule([lv['6e']], lines(10_000)))
+      .expect(201);
+    const sid = await enroll('Supp', cl['6e']);
+    const fee = await feeOf(sid);
+    await prisma.feePayment.create({
+      data: {
+        schoolId,
+        studentFeeId: fee!.id,
+        amount: 1_000,
+        method: 'CASH',
+        status: 'PAID',
+        paidAt: new Date(),
+      },
+    });
+    const res = await http
+      .delete(`/schools/${schoolId}/students/${sid}`)
+      .set(auth())
+      .expect(409);
+    expect(res.body.message).toBe(
+      'Cet élève a des paiements enregistrés : il ne peut pas être supprimé.',
+    );
+    const free = await enroll('Supp2', cl['6e']);
+    await http
+      .delete(`/schools/${schoolId}/students/${free}`)
+      .set(auth())
+      .expect(204);
+    await http
+      .delete(`/schools/${schoolId}/fees/schedules/${r.body.id}`)
+      .set(auth())
+      .expect(204);
+  });
+
   it('offre Essentiel : une seule tranche', async () => {
     const e = await makeSchool('ess', 'ESSENTIEL');
     const l = await prisma.level.create({
@@ -275,6 +348,23 @@ describe('Frais de scolarité : grille et montants figés (e2e)', () => {
         .send({ studentId: other, amount: 1_000 })
         .expect(201);
       expect(r2.body.receiptNumber).toBe(`REC-${YEAR}-000002`);
+    });
+
+    it('un encaissement ne fait pas avancer School.updatedAt', async () => {
+      const id = await enroll('Stable', cl['5e']);
+      const before = await prisma.school.findUniqueOrThrow({
+        where: { id: schoolId },
+      });
+      await http
+        .post(`${base()}/payments`)
+        .set(auth())
+        .send({ studentId: id, amount: 1_000 })
+        .expect(201);
+      const after = await prisma.school.findUniqueOrThrow({
+        where: { id: schoolId },
+      });
+      expect(after.receiptSeq).toBe(before.receiptSeq + 1);
+      expect(after.updatedAt).toEqual(before.updatedAt);
     });
 
     it('refuse un encaissement supérieur au reste à payer', async () => {
@@ -395,7 +485,12 @@ describe('Frais de scolarité : grille et montants figés (e2e)', () => {
         .map((m) => m.subject);
 
     // Élève avec parent (email unique à l'exécution), une tranche de 30 000 échue à `dueOn`.
-    async function studentDue(name: string, dueOn: string, paid = 0) {
+    async function studentDue(
+      name: string,
+      dueOn: string,
+      paid = 0,
+      createdAt: Date | null = new Date('2026-01-01'),
+    ) {
       await http
         .post(`/schools/${rId}/fees/schedules`)
         .set({ Authorization: `Bearer ${rToken}` })
@@ -433,6 +528,11 @@ describe('Frais de scolarité : grille et montants figés (e2e)', () => {
         },
       });
       expect(parent.id).toBeTruthy();
+      if (createdAt)
+        await prisma.studentFee.updateMany({
+          where: { studentId: st.body.id },
+          data: { createdAt },
+        });
       if (paid) {
         const fee = await prisma.studentFee.findFirstOrThrow({
           where: { studentId: st.body.id },
@@ -474,6 +574,15 @@ describe('Frais de scolarité : grille et montants figés (e2e)', () => {
       ]);
       await lifecycle.runDaily(NOW);
       expect(sent()).toHaveLength(1);
+    });
+
+    it('dû créé aujourd’hui avec une tranche échue le mois dernier : aucun email', async () => {
+      const before = sent().length;
+      await prisma.feeSchedule.deleteMany({ where: { schoolId: rId } });
+      await prisma.studentFee.deleteMany({ where: { schoolId: rId } });
+      await studentDue('Recent', '2026-09-01', 0, null);
+      await app.get(LifecycleService).runDaily(new Date());
+      expect(sent()).toHaveLength(before);
     });
 
     it('tranche soldée : aucun email', async () => {
