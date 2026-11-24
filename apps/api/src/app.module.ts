@@ -13,6 +13,7 @@ import { StorageModule } from './storage/storage.module';
 import { DisciplineModule } from './discipline/discipline.controller';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt.guard';
+import { NotificationsModule } from './notifications/notifications.module';
 import { MailModule } from './mail/mail.module';
 import { PlatformModule } from './platform/platform.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -52,6 +53,7 @@ function validateEnv(env: Record<string, unknown>) {
     ScheduleModule.forRoot(),
     PrismaModule,
     MailModule,
+    NotificationsModule,
     AuthModule,
     SchoolsModule,
     PlatformModule,

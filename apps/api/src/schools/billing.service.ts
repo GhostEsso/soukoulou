@@ -9,6 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { MailService } from '../mail/mail.module';
+import { NotificationsService } from '../notifications/notifications.module';
 import { PrismaService } from '../prisma/prisma.module';
 import { CheckoutDto, PaymentWebhookDto } from './dto';
 import { OnboardingService } from './onboarding.service';
@@ -21,6 +22,7 @@ export class BillingService {
     private readonly onboarding: OnboardingService,
     private readonly mail: MailService,
     private readonly config: ConfigService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   listPlans() {
@@ -193,6 +195,15 @@ export class BillingService {
             : `Merci ! Votre abonnement ${plan.name} est prolongé jusqu’au ${end.toLocaleDateString('fr-FR')}.`,
         });
       }
+      await this.notifications.toAdmins(
+        school.id,
+        {
+          kind: 'SCHOOL',
+          title: `Paiement reçu · facture ${invoiceNumber}`,
+          body: `Abonnement ${plan.name} actif jusqu’au ${end.toLocaleDateString('fr-FR')}.`,
+        },
+        '/abonnement',
+      );
     }
     return { status: 'PAID' as const };
   }

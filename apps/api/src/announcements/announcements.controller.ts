@@ -21,6 +21,7 @@ import {
 } from 'class-validator';
 import type { AuthUser } from '../auth/decorators';
 import { CurrentUser } from '../auth/decorators';
+import { NotificationsService } from '../notifications/notifications.module';
 import { PrismaService } from '../prisma/prisma.module';
 import { OnboardingService } from '../schools/onboarding.service';
 import { SchoolsModule } from '../schools/schools.module';
@@ -53,6 +54,7 @@ export class AnnouncementsController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly onboarding: OnboardingService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   @Get()
@@ -91,10 +93,21 @@ export class AnnouncementsController {
     await this.onboarding.assertSchoolAdmin(u.id, s);
     const { access, denial } = await this.onboarding.can(s, 'write');
     if (!access) throw new ForbiddenException(denial);
-    return this.prisma.announcement.create({
+    const a = await this.prisma.announcement.create({
       data: { ...dto, schoolId: s, createdById: u.id },
       select: { id: true },
     });
+    await this.notifications.toRoles(
+      s,
+      dto.audiences,
+      {
+        kind: 'ANNOUNCEMENT',
+        title: `Annonce : ${dto.title}`,
+        body: dto.body.length > 140 ? `${dto.body.slice(0, 140)}…` : dto.body,
+      },
+      (space) => (space === 'parent' ? '/annonces' : '#annonces'),
+    );
+    return a;
   }
 
   @Delete(':id')

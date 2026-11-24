@@ -17,6 +17,7 @@ import { IsIn, IsString, Length, Matches } from 'class-validator';
 import { isoDay, parseDay } from '../attendance/rules';
 import type { AuthUser } from '../auth/decorators';
 import { CurrentUser } from '../auth/decorators';
+import { NotificationsService } from '../notifications/notifications.module';
 import { PrismaService } from '../prisma/prisma.module';
 import { OnboardingService } from '../schools/onboarding.service';
 import { SchoolsModule } from '../schools/schools.module';
@@ -55,6 +56,7 @@ export class DisciplineController {
   constructor(
     private readonly prisma: PrismaService,
     private readonly onboarding: OnboardingService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   @Get()
@@ -81,10 +83,13 @@ export class DisciplineController {
       throw new BadRequestException('Date invalide : pas de date future.');
     const student = await this.prisma.student.findFirst({
       where: { id: studentId, schoolId: s },
-      select: { id: true },
+      select: { id: true, firstName: true },
     });
     if (!student) throw new NotFoundException('Élève introuvable.');
-    return this.prisma.disciplineRecord.create({
+    const label = { MERIT: 'Mérite', PUNISHMENT: 'Punition', BLAME: 'Blâme' }[
+      kind
+    ];
+    const record = await this.prisma.disciplineRecord.create({
       data: {
         schoolId: s,
         studentId,
@@ -95,6 +100,12 @@ export class DisciplineController {
       },
       select: { id: true },
     });
+    await this.notifications.toFamily(s, studentId, {
+      kind: 'DISCIPLINE',
+      title: `${label} : ${student.firstName}`,
+      body: reason,
+    });
+    return record;
   }
 
   @Delete(':id')

@@ -26,6 +26,8 @@ export interface HeaderToolsProps {
   /** Absent tant que la messagerie n'existe pas : l'icône l'indique. */
   messagesHref?: string;
   unreadMessages?: number;
+  /** Appelée à l'ouverture de la cloche quand il y a du non lu. */
+  markRead?: () => Promise<void>;
 }
 
 const Dot = ({ count }: { count: number }) =>
@@ -35,7 +37,7 @@ const Dot = ({ count }: { count: number }) =>
     </span>
   ) : null;
 
-export function HeaderTools({ today, notices, noticesHref, messagesHref, unreadMessages = 0 }: HeaderToolsProps) {
+export function HeaderTools({ today, notices, noticesHref, messagesHref, unreadMessages = 0, markRead }: HeaderToolsProps) {
   const [open, setOpen] = useState(false);
   const unread = notices.filter((n) => n.unread).length;
 
@@ -64,7 +66,13 @@ export function HeaderTools({ today, notices, noticesHref, messagesHref, unreadM
         </Tooltip>
       )}
 
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover
+        open={open}
+        onOpenChange={(o) => {
+          setOpen(o);
+          if (o && unread > 0) void markRead?.();
+        }}
+      >
         <PopoverTrigger asChild>
           <Button variant="ghost" size="icon" className="relative" aria-label={`Notifications${unread ? `, ${unread} non lues` : ""}`}>
             <Bell aria-hidden />

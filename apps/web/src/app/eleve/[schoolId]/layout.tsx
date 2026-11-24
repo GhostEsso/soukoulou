@@ -1,17 +1,18 @@
 import { notFound, redirect } from "next/navigation";
-import { feedNotices } from "@/components/announcement-feed";
 import { AppShell } from "@/components/app-shell";
 import { ApiError } from "@/lib/api";
-import { getFeed, getMe, getStudentHome } from "@/lib/data";
+import { getMe, getNotifications, getStudentHome } from "@/lib/data";
+import { storedNotices } from "@/lib/notices";
+import { markNotificationsRead } from "../../notification-actions";
 import { logoUrl, todayLabel } from "@/lib/format";
 import { logout } from "../../(auth)/actions";
 
 /** Espace élève : son propre suivi, en lecture seule. */
 export default async function StudentLayout({ children, params }: LayoutProps<"/eleve/[schoolId]">) {
   const { schoolId } = await params;
-  const [me, feed, home] = await Promise.all([
+  const [me, notifications, home] = await Promise.all([
     getMe(),
-    getFeed(schoolId).catch(() => []),
+    getNotifications(schoolId).catch(() => ({ items: [], unread: 0 })),
     getStudentHome(schoolId).catch((e: unknown) => {
       if (e instanceof ApiError && (e.status === 403 || e.status === 404)) notFound();
       throw e;
@@ -34,7 +35,9 @@ export default async function StudentLayout({ children, params }: LayoutProps<"/
       ]}
       user={{ name: `${me.firstName} ${me.lastName}`, email: home.child.matricule }}
       logoutAction={logout}
-      tools={{ today: todayLabel(), notices: feedNotices(feed, `/eleve/${schoolId}`) }}
+      tools={{ today: todayLabel(), notices: storedNotices(notifications.items, `/eleve/${schoolId}`),
+        markRead: markNotificationsRead.bind(null, schoolId),
+      }}
     >
       {children}
     </AppShell>

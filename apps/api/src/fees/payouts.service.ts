@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { Prisma, PayoutStatus } from '@prisma/client';
 import { MailService } from '../mail/mail.module';
+import { NotificationsService } from '../notifications/notifications.module';
 import { PrismaService } from '../prisma/prisma.module';
 import { fmt, onlineCollected } from './cashbox.service';
 import { availableForPayout } from './rules';
@@ -22,6 +23,7 @@ export class PayoutsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async requestPayout(
@@ -127,6 +129,11 @@ export class PayoutsService {
     });
     const m = mail(payout.amount);
     for (const o of owners) this.mail.send({ to: o.user.email, ...m });
+    await this.notifications.toAdmins(
+      payout.schoolId,
+      { kind: 'PAYOUT', title: m.subject, body: m.text },
+      '/frais/decaissements',
+    );
     return this.prisma.payout.findUniqueOrThrow({ where: { id } });
   }
 }

@@ -124,6 +124,7 @@ model School {
   receiptSeq          Int                @default(0) // compteur de reçus (incrément atomique)
   brandColor          String? // couleur d'accent (#RRGGBB), offre Premium
   logoKey             String? // logo de l'école (stockage S3)
+  notifications       Notification[]
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
 
@@ -292,6 +293,7 @@ model User {
   student       Student?
   announcements Announcement[]
   discipline    DisciplineRecord[]
+  notifications Notification[]
 }
 
 model Membership {
@@ -809,4 +811,22 @@ model FeeReminder {
   sentAt       DateTime     @default(now())
 
   @@unique([studentFeeId, position, kind])
+}
+
+/// Notification dans la cloche d'un utilisateur, pour une école (paiement, annonce, absence…).
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  schoolId  String
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  /// PAYMENT, ANNOUNCEMENT, ATTENDANCE, DISCIPLINE, FEE_REMINDER, PAYOUT, SCHOOL
+  kind      String
+  title     String
+  body      String?
+  href      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, schoolId, createdAt])
 }

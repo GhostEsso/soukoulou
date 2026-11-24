@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { NotificationsService } from '../notifications/notifications.module';
 import { PrismaService } from '../prisma/prisma.module';
 import { OnboardingService } from '../schools/onboarding.service';
 import type { RollCallDto } from './dto';
@@ -17,6 +18,7 @@ export class AttendanceService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly onboarding: OnboardingService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private day(s: string | undefined) {
@@ -88,6 +90,11 @@ export class AttendanceService {
         'Un élève de la liste n’est pas inscrit dans cette classe.',
       );
     }
+    // Avant l'enregistrement : seule une nouvelle absence ou un nouveau retard prévient la famille.
+    const before = await this.prisma.attendance.findMany({
+      where: { day, studentId: { in: dto.items.map((i) => i.studentId) } },
+      select: { studentId: true, status: true },
+    });
     await this.prisma.$transaction(
       dto.items.map((i) =>
         this.prisma.attendance.upsert({
@@ -103,6 +110,29 @@ export class AttendanceService {
         }),
       ),
     );
+    const was = new Map(before.map((b) => [b.studentId, b.status]));
+    const news = dto.items.filter(
+      (i) => i.status !== 'PRESENT' && was.get(i.studentId) !== i.status,
+    );
+    if (news.length) {
+      const names = await this.prisma.student.findMany({
+        where: { id: { in: news.map((i) => i.studentId) } },
+        select: { id: true, firstName: true },
+      });
+      const label = day.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        timeZone: 'UTC',
+      });
+      for (const i of news) {
+        const name = names.find((n) => n.id === i.studentId)?.firstName ?? '';
+        await this.notifications.toFamily(schoolId, i.studentId, {
+          kind: 'ATTENDANCE',
+          title: `${i.status === 'ABSENT' ? 'Absence' : 'Retard'} : ${name}`,
+          body: `${i.status === 'ABSENT' ? 'Absent(e)' : 'En retard'} le ${label} (${c.name}).`,
+        });
+      }
+    }
     return this.roster(schoolId, c.id, isoDay(day));
   }
 

@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AnnouncementFeed } from "@/components/announcement-feed";
-import { getFeed, getParentHome } from "@/lib/data";
+import { getParentHome } from "@/lib/data";
 import { RELATIONS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -9,7 +8,7 @@ export const metadata: Metadata = { title: "Accueil" };
 
 export default async function ParentHomePage({ params }: PageProps<"/parent/[schoolId]">) {
   const { schoolId } = await params;
-  const [home, feed] = await Promise.all([getParentHome(schoolId), getFeed(schoolId)]);
+  const home = await getParentHome(schoolId);
 
   return (
     <div className="space-y-4">
@@ -49,7 +48,6 @@ export default async function ParentHomePage({ params }: PageProps<"/parent/[sch
           ))}
         </ul>
       )}
-      <AnnouncementFeed items={feed} />
     </div>
   );
 }

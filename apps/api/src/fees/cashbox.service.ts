@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.module';
 import { PrismaService } from '../prisma/prisma.module';
 import { CashDto } from './dto';
 import { allocate, availableForPayout, receiptNumber } from './rules';
@@ -65,7 +66,10 @@ const feeInclude = {
 
 @Injectable()
 export class CashboxService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   /** Année de référence : l'année demandée, sinon la courante, sinon la plus récente. */
   async yearId(schoolId: string, yearId?: string) {
@@ -176,7 +180,7 @@ export class CashboxService {
       : null;
     if (!fee) throw new NotFoundException('Aucun frais pour cet élève.');
 
-    return this.prisma.$transaction(async (tx) => {
+    const paid = await this.prisma.$transaction(async (tx) => {
       // Verrou sur le dû : deux encaissements simultanés se suivent au lieu de se croiser.
       const locked = await tx.$queryRaw<
         { id: string }[]
@@ -213,6 +217,8 @@ export class CashboxService {
       const number = await assignReceipt(tx, schoolId, p.id, now);
       return { ...p, receiptNumber: number };
     });
+    await this.notifications.feePaid(paid.id);
+    return paid;
   }
 
   /** Reçu d'un paiement PAID ; `studentId` restreint au paiement d'un élève (espace parent). */

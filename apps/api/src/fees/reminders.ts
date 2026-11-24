@@ -1,4 +1,5 @@
 import { MailService } from '../mail/mail.module';
+import type { NotificationsService } from '../notifications/notifications.module';
 import { PrismaService } from '../prisma/prisma.module';
 import { FEATURES } from '../schools/rules';
 import { fmt } from './cashbox.service';
@@ -17,6 +18,7 @@ export async function sendFeeReminders(
   prisma: PrismaService,
   mail: MailService,
   now: Date,
+  notifications?: NotificationsService,
 ): Promise<number> {
   const fees = await prisma.studentFee.findMany({
     where: {
@@ -29,6 +31,8 @@ export async function sendFeeReminders(
     select: {
       id: true,
       createdAt: true,
+      schoolId: true,
+      studentId: true,
       school: { select: { name: true } },
       student: {
         select: {
@@ -67,6 +71,12 @@ export async function sendFeeReminders(
         mail.send({ to: p.parent.email, subject, text });
         sent++;
       }
+      await notifications?.toFamily(
+        f.schoolId,
+        f.studentId,
+        { kind: 'FEE_REMINDER', title: subject, body: text },
+        { student: false },
+      );
     }
   }
   return sent;

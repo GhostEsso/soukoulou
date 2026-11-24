@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import type { Prisma, VerificationStatus } from '@prisma/client';
 import { MailService } from '../mail/mail.module';
+import { NotificationsService } from '../notifications/notifications.module';
 import { PrismaService } from '../prisma/prisma.module';
 import { BillingService } from '../schools/billing.service';
 import { OnboardingService } from '../schools/onboarding.service';
@@ -41,6 +42,7 @@ export class PlatformService {
     private readonly onboarding: OnboardingService,
     private readonly billing: BillingService,
     private readonly mail: MailService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // ── Alertes ─────────────────────────────────────────────
@@ -465,5 +467,10 @@ export class PlatformService {
     });
     for (const m of members)
       this.mail.send({ to: m.user.email, subject, text });
+    await this.notifications.toAdmins(schoolId, {
+      kind: 'SCHOOL',
+      title: subject,
+      body: text,
+    });
   }
 }
