@@ -122,7 +122,7 @@ Toutes les relations vers `School`, `Student`, `StudentFee` en `onDelete: Cascad
 
 ---
 
-### Tâche 1 : Schéma, offres et fonctionnalité `fee_tracking`
+### Task 1: Schéma, offres et fonctionnalité `fee_tracking`
 
 **Fichiers :** `prisma/schema.prisma`, `prisma/seed.ts`, `src/schools/rules.ts`, `src/schools/rules.spec.ts`
 
@@ -133,7 +133,7 @@ Toutes les relations vers `School`, `Student`, `StudentFee` en `onDelete: Cascad
 - [ ] Écrire le schéma, puis `pnpm --filter api exec prisma migrate dev --name frais_de_scolarite`. Relancer les tests → SUCCÈS.
 - [ ] Commit `Frais de scolarité : schéma et fonctionnalités par offre`.
 
-### Tâche 2 : Règles pures
+### Task 2: Règles pures
 
 **Fichiers :** `src/fees/rules.ts`, `src/fees/rules.spec.ts`
 
@@ -161,7 +161,7 @@ availableForPayout(onlinePaid: number, payouts: { amount: number; status: Payout
 - [ ] `pnpm --filter api test -- fees/rules` → ÉCHEC, implémenter, → SUCCÈS.
 - [ ] Commit `Frais de scolarité : règles pures (grille, tranches, allocation, relances)`.
 
-### Tâche 3 : Grille et montants figés par élève
+### Task 3: Grille et montants figés par élève
 
 **Fichiers :** `src/fees/dto.ts`, `src/fees/fees.service.ts`, `src/fees/fees.controller.ts`, `src/fees/fees.module.ts`, `src/app.module.ts`, `src/students/students.service.ts`, `test/fees.e2e-spec.ts`
 
@@ -181,7 +181,7 @@ availableForPayout(onlinePaid: number, payouts: { amount: number; status: Payout
 - [ ] Lancer `pnpm test:api -- fees` → ÉCHEC, implémenter, → SUCCÈS.
 - [ ] Commit `Frais de scolarité : grille et montants figés par élève`.
 
-### Tâche 4 : Caisse, soldes, reçus, tableau de bord
+### Task 4: Caisse, soldes, reçus, tableau de bord
 
 **Fichiers :** `src/fees/fees.service.ts`, `src/fees/fees.controller.ts`, `src/fees/dto.ts`, `test/fees.e2e-spec.ts`
 
@@ -201,7 +201,7 @@ availableForPayout(onlinePaid: number, payouts: { amount: number; status: Payout
   - autre école : `GET …/payments/:id/receipt` → 404.
 - [ ] ÉCHEC → implémenter → SUCCÈS. Commit `Frais de scolarité : caisse, reçus et tableau de bord`.
 
-### Tâche 5 : Relances
+### Task 5: Relances
 
 **Fichiers :** `src/fees/reminders.ts`, `src/schools/lifecycle.service.ts`, `test/fees.e2e-spec.ts`
 
@@ -210,7 +210,7 @@ availableForPayout(onlinePaid: number, payouts: { amount: number; status: Payout
 - [ ] Tests e2e : `runDaily` 6 jours avant l'échéance → 1 email dans `mail.outbox` ; relancer `runDaily` le même jour → aucun nouvel email ; tranche soldée → aucun email.
 - [ ] ÉCHEC → implémenter → SUCCÈS. Commit `Frais de scolarité : relances des tranches`.
 
-### Tâche 6 : Paiement en ligne par le parent
+### Task 6: Paiement en ligne par le parent
 
 **Fichiers :** `src/fees/online.service.ts`, `src/fees/fees.controller.ts`, `src/family-space/parent-space.controller.ts`, `test/fees.e2e-spec.ts`
 
@@ -225,7 +225,7 @@ availableForPayout(onlinePaid: number, payouts: { amount: number; status: Payout
   - parent d'un autre élève → 404 ; école sans `fee_payments` → 403 `PLAN`.
 - [ ] ÉCHEC → implémenter → SUCCÈS. Commit `Frais de scolarité : paiement en ligne des parents`.
 
-### Tâche 7 : Décaissements
+### Task 7: Décaissements
 
 **Fichiers :** `src/fees/online.service.ts`, `src/fees/fees.controller.ts`, `src/platform/platform.controller.ts`, `src/platform/platform.service.ts`, `test/fees.e2e-spec.ts`
 
@@ -238,7 +238,7 @@ availableForPayout(onlinePaid: number, payouts: { amount: number; status: Payout
 - [ ] Tests e2e : 10 000 payés en ligne ; demande de 6 000 → 201 ; deux demandes simultanées de 4 000 et 4 000 (`Promise.all`) → une 201, une 400 ; rejet de la 1re → 6 000 de nouveau disponibles ; marquer payé → statut `PAID`.
 - [ ] ÉCHEC → implémenter → SUCCÈS. Commit `Frais de scolarité : demandes de décaissement`.
 
-### Tâche 8 : Écrans école, parent et admin
+### Task 8: Écrans école, parent et admin
 
 **Fichiers :** pages web listées plus haut, `apps/api/prisma/seed-demo.ts`
 
