@@ -59,6 +59,7 @@ enum PaymentMethod {
   MOBILE_MONEY
   CARD
   TRANSFER
+  CASH
 }
 
 enum PaymentStatus {
@@ -120,6 +121,7 @@ model School {
   plan                Plan?              @relation(fields: [planId], references: [id])
   subscriptionEndsAt  DateTime?
   suspendedReason     String?
+  receiptSeq          Int                @default(0) // compteur de reçus (incrément atomique)
   brandColor          String? // couleur d'accent (#RRGGBB), offre Premium
   createdAt           DateTime           @default(now())
   updatedAt           DateTime           @updatedAt
@@ -129,6 +131,11 @@ model School {
   events      SchoolEvent[]
   payments    SubscriptionPayment[]
   alerts      PlatformAlert[]
+
+  feeSchedules FeeSchedule[]
+  studentFees  StudentFee[]
+  feePayments  FeePayment[]
+  payouts      Payout[]
 
   academicYears AcademicYear[]
   levels        Level[]
@@ -333,6 +340,9 @@ model AcademicYear {
   enrollments Enrollment[]
   council     CouncilNote[]
 
+  feeSchedules FeeSchedule[]
+  studentFees  StudentFee[]
+
   @@unique([schoolId, label])
 }
 
@@ -361,6 +371,8 @@ model Level {
 
   subjects   LevelSubject[]
   classrooms Classroom[]
+
+  feeSchedules FeeSchedule[]
 
   @@unique([schoolId, name])
 }
@@ -437,6 +449,7 @@ model Student {
   council     CouncilNote[]
   parents     ParentChild[]
   discipline  DisciplineRecord[]
+  fees        StudentFee[]
 
   /// Compte de connexion (matricule + mot de passe), créé par l'école.
   userId String? @unique
@@ -670,4 +683,127 @@ model DisciplineRecord {
   createdAt   DateTime       @default(now())
 
   @@index([schoolId, studentId, day])
+}
+
+enum PayoutStatus {
+  REQUESTED
+  PAID
+  REJECTED
+}
+
+enum ReminderKind {
+  DUE_SOON
+  OVERDUE
+}
+
+/// Une règle de la grille des frais de scolarité.
+model FeeSchedule {
+  id        String            @id @default(cuid())
+  schoolId  String
+  school    School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  yearId    String
+  year      AcademicYear      @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  label     String            @default("Scolarité")
+  sex       Sex? // null = tous
+  levels    Level[] // relation implicite n-n
+  lines     FeeScheduleLine[]
+  students  StudentFee[]
+  createdAt DateTime          @default(now())
+
+  @@index([schoolId, yearId])
+}
+
+model FeeScheduleLine {
+  id         String      @id @default(cuid())
+  scheduleId String
+  schedule   FeeSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  position   Int
+  amount     Int
+  dueOn      DateTime    @db.Date
+
+  @@unique([scheduleId, position])
+}
+
+/// Montant figé pour un élève et une année.
+model StudentFee {
+  id         String       @id @default(cuid())
+  schoolId   String
+  school     School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId  String
+  student    Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  yearId     String
+  year       AcademicYear @relation(fields: [yearId], references: [id], onDelete: Cascade)
+  scheduleId String? // SetNull si la règle est supprimée
+  schedule   FeeSchedule? @relation(fields: [scheduleId], references: [id], onDelete: SetNull)
+  label      String
+  createdAt  DateTime     @default(now())
+
+  lines     StudentFeeLine[]
+  payments  FeePayment[]
+  reminders FeeReminder[]
+
+  @@unique([studentId, yearId])
+  @@index([schoolId, yearId])
+}
+
+model StudentFeeLine {
+  id           String     @id @default(cuid())
+  studentFeeId String
+  studentFee   StudentFee @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
+  position     Int
+  amount       Int
+  dueOn        DateTime   @db.Date
+
+  @@unique([studentFeeId, position])
+}
+
+model FeePayment {
+  id            String        @id @default(cuid())
+  schoolId      String
+  school        School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentFeeId  String
+  studentFee    StudentFee    @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
+  amount        Int
+  method        PaymentMethod
+  status        PaymentStatus @default(PENDING)
+  provider      String?
+  providerRef   String?       @unique
+  receiptNumber String? // « REC-2026-000042 », attribué au passage à PAID
+  recordedById  String? // caissier (espèces)
+  parentId      String? // payeur (en ligne)
+  paidAt        DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@unique([schoolId, receiptNumber])
+  @@index([schoolId, status])
+}
+
+/// Demande de décaissement.
+model Payout {
+  id            String       @id @default(cuid())
+  schoolId      String
+  school        School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  amount        Int
+  destination   String // numéro Mobile Money ou RIB saisi par l'école
+  status        PayoutStatus @default(REQUESTED)
+  requestedById String
+  processedById String?
+  providerRef   String?
+  rejectReason  String?
+  createdAt     DateTime     @default(now())
+  processedAt   DateTime?
+
+  @@index([status])
+}
+
+/// Une relance envoyée : empêche les doublons.
+model FeeReminder {
+  id           String       @id @default(cuid())
+  studentFeeId String
+  studentFee   StudentFee   @relation(fields: [studentFeeId], references: [id], onDelete: Cascade)
+  position     Int
+  kind         ReminderKind
+  sentAt       DateTime     @default(now())
+
+  @@unique([studentFeeId, position, kind])
 }

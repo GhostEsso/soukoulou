@@ -1,4 +1,5 @@
 import {
+  ALL_FEATURES,
   amountFor,
   checkAccess,
   FEATURES,
@@ -124,6 +125,10 @@ describe('facturation', () => {
 });
 
 describe('divers', () => {
+  it('fonctionnalité fee_tracking', () => {
+    expect(ALL_FEATURES).toContain('fee_tracking');
+  });
+
   it('adresse', () => {
     expect(isSlugAllowed('lycee-espoir')).toBe(true);
     expect(isSlugAllowed('admin')).toBe(false);

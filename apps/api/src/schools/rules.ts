@@ -16,6 +16,7 @@ export const FEATURES = {
   MESSAGING: 'messaging',
   FEE_PAYMENTS: 'fee_payments',
   CASHBOX: 'cashbox',
+  FEE_TRACKING: 'fee_tracking',
   CUSTOM_REPORT_CARDS: 'custom_report_cards',
   ADVANCED_STATS: 'advanced_stats',
   EXPORTS: 'exports',
