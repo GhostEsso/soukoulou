@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { NotificationsService } from '../notifications/notifications.module';
 import { PrismaService } from '../prisma/prisma.module';
 import { OnboardingService } from '../schools/onboarding.service';
 import type { PaymentWebhookDto } from '../schools/dto';
@@ -31,6 +32,7 @@ export class OnlineService {
     private readonly onboarding: OnboardingService,
     private readonly config: ConfigService,
     private readonly cashbox: CashboxService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async checkout(
@@ -287,6 +289,7 @@ export class OnlineService {
       select: { id: true, schoolId: true, studentFeeId: true },
     });
     if (!payment) return;
+    let confirmed = false;
     await this.prisma.$transaction(async (tx) => {
       // Ordre des verrous comme recordCash : StudentFee, puis School (assignReceipt).
       const locked = await tx.$queryRaw<
@@ -300,6 +303,7 @@ export class OnlineService {
       });
       if (count !== 1) return; // rejeu : déjà traité
       await assignReceipt(tx, payment.schoolId, payment.id, now);
+      confirmed = true;
       // L'argent est reçu : on ne le refuse jamais. Si deux paiements ouverts en parallèle
       // dépassent le dû, on garde les deux (remboursement hors périmètre) et on le signale.
       const [lines, paid] = await Promise.all([
@@ -317,6 +321,7 @@ export class OnlineService {
           `Trop-perçu : paiement ${payment.id} (frais ${payment.studentFeeId}) dépasse le dû, à rembourser.`,
         );
     });
+    if (confirmed) await this.notifications.feePaid(payment.id);
   }
 
   private async statusOf(id: string) {

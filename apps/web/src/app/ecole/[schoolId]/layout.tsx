@@ -2,20 +2,22 @@ import { notFound } from "next/navigation";
 import { AppShell, type NavItem } from "@/components/app-shell";
 import { StatusBadge } from "@/components/status-badge";
 import { ApiError } from "@/lib/api";
-import { brandColorOf, getMe, getOnboarding } from "@/lib/data";
+import { brandColorOf, getMe, getNotifications, getOnboarding } from "@/lib/data";
 import { logoUrl, SUBSCRIPTION, todayLabel } from "@/lib/format";
-import { schoolNotices } from "@/lib/notices";
+import { schoolNotices, storedNotices } from "@/lib/notices";
+import { markNotificationsRead } from "../../notification-actions";
 import { logout } from "../../(auth)/actions";
 import { StatusBanner } from "./status-banner";
 
 export default async function SchoolLayout({ children, params }: LayoutProps<"/ecole/[schoolId]">) {
   const { schoolId } = await params;
-  const [me, onboarding] = await Promise.all([
+  const [me, onboarding, notifications] = await Promise.all([
     getMe(),
     getOnboarding(schoolId).catch((e: unknown) => {
       if (e instanceof ApiError && (e.status === 403 || e.status === 404)) notFound();
       throw e;
     }),
+    getNotifications(schoolId).catch(() => ({ items: [], unread: 0 })),
   ]);
   const { school, requirements } = onboarding;
   const base = `/ecole/${school.id}`;
@@ -24,7 +26,8 @@ export default async function SchoolLayout({ children, params }: LayoutProps<"/e
     (r) => (r.isMandatory && !r.document) || r.document?.reviewStatus === "REJECTED",
   ).length;
   const brand = brandColorOf(onboarding);
-  const notices = schoolNotices(onboarding);
+  // Alertes du dossier d'abord (tant que la situation dure), puis l'historique.
+  const notices = [...schoolNotices(onboarding), ...storedNotices(notifications.items, `/ecole/${schoolId}`)];
 
   const groups: { label?: string; items: NavItem[] }[] = [
     {
@@ -104,7 +107,7 @@ export default async function SchoolLayout({ children, params }: LayoutProps<"/e
         groups={groups}
         user={{ name: `${me.firstName} ${me.lastName}`, email: me.email }}
         logoutAction={logout}
-        tools={{ today: todayLabel(), notices }}
+        tools={{ today: todayLabel(), notices, markRead: markNotificationsRead.bind(null, schoolId) }}
         headerEnd={
           <StatusBadge tone={SUBSCRIPTION[school.subscriptionStatus].tone} className="hidden sm:inline-flex">
             {SUBSCRIPTION[school.subscriptionStatus].label}

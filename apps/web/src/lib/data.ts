@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { api } from "./api";
-import type { Announcement, AttendanceDay, Me, Onboarding, Plan, Structure, ParentHome, StudentHome, StudentStats, TeacherHome } from "./types";
+import type { Announcement, AppNotification, AttendanceDay, Me, Onboarding, ParentHome, Plan, Structure, StudentHome, StudentStats, TeacherHome } from "./types";
 
 // Dédupliqués sur une même requête (layout + page).
 export const getMe = cache(() => api<Me>("/auth/me"));
@@ -23,6 +23,9 @@ export const getStudentHome = cache((schoolId: string) =>
 /** Annonces destinées au rôle du compte (enseignant, parent, élève). */
 export const getFeed = cache((schoolId: string) =>
   api<Announcement[]>(`/schools/${encodeURIComponent(schoolId)}/announcements/feed`),
+);
+export const getNotifications = cache((schoolId: string) =>
+  api<{ items: AppNotification[]; unread: number }>(`/schools/${encodeURIComponent(schoolId)}/notifications`),
 );
 export const getStructure = cache((schoolId: string) =>
   api<Structure>(`/schools/${encodeURIComponent(schoolId)}/structure`),

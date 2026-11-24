@@ -25,13 +25,3 @@ export function AnnouncementFeed({ items }: { items: Announcement[] }) {
     </section>
   );
 }
-
-/** Les annonces récentes dans la cloche de l'en-tête (lien vers le fil de l'accueil). */
-export const feedNotices = (items: Announcement[], href: string) =>
-  items.slice(0, 5).map((a) => ({
-    id: a.id,
-    title: a.title,
-    detail: a.body.length > 90 ? `${a.body.slice(0, 90)}…` : a.body,
-    time: dateTime(a.createdAt),
-    href: `${href}#annonces`,
-  }));

@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { sendFeeReminders } from '../fees/reminders';
 import { MailService } from '../mail/mail.module';
+import { NotificationsService } from '../notifications/notifications.module';
 import { PrismaService } from '../prisma/prisma.module';
 
 const DAY = 86_400_000;
@@ -20,6 +21,7 @@ export class LifecycleService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly mail: MailService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   @Cron('0 6 * * *')
@@ -35,7 +37,7 @@ export class LifecycleService {
     await this.expireSubscriptions(now);
     await this.endVacations(now);
     await this.remind(now);
-    await sendFeeReminders(this.prisma, this.mail, now);
+    await sendFeeReminders(this.prisma, this.mail, now, this.notifications);
   }
 
   /** Mode découverte terminé sans upgrade : l'école et ses comptes sans autre école sont supprimés. */

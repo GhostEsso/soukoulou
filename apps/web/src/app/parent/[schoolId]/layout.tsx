@@ -1,17 +1,18 @@
 import { notFound, redirect } from "next/navigation";
-import { feedNotices } from "@/components/announcement-feed";
 import { AppShell } from "@/components/app-shell";
 import { ApiError } from "@/lib/api";
-import { getFeed, getMe, getParentHome } from "@/lib/data";
+import { getMe, getNotifications, getParentHome } from "@/lib/data";
+import { storedNotices } from "@/lib/notices";
+import { markNotificationsRead } from "../../notification-actions";
 import { logoUrl, todayLabel } from "@/lib/format";
 import { logout } from "../../(auth)/actions";
 
 /** Espace parent : le suivi de ses enfants, en lecture seule. */
 export default async function ParentLayout({ children, params }: LayoutProps<"/parent/[schoolId]">) {
   const { schoolId } = await params;
-  const [me, feed, home] = await Promise.all([
+  const [me, notifications, home] = await Promise.all([
     getMe(),
-    getFeed(schoolId).catch(() => []),
+    getNotifications(schoolId).catch(() => ({ items: [], unread: 0 })),
     getParentHome(schoolId).catch((e: unknown) => {
       if (e instanceof ApiError && (e.status === 403 || e.status === 404)) notFound();
       throw e;
@@ -26,7 +27,12 @@ export default async function ParentLayout({ children, params }: LayoutProps<"/p
       logo={logoUrl(schoolId, home.school.logo)}
       subtitle="Espace parent"
       groups={[
-        { items: [{ href: base, label: "Accueil", icon: "home", exact: true }] },
+        {
+          items: [
+            { href: base, label: "Accueil", icon: "home", exact: true },
+            { href: `${base}/annonces`, label: "Annonces", icon: "announcements" },
+          ],
+        },
         {
           label: "Mes enfants",
           items: home.children.map((c) => ({
@@ -38,7 +44,9 @@ export default async function ParentLayout({ children, params }: LayoutProps<"/p
       ]}
       user={{ name: `${me.firstName} ${me.lastName}`, email: me.email ?? me.loginPhone }}
       logoutAction={logout}
-      tools={{ today: todayLabel(), notices: feedNotices(feed, `/parent/${schoolId}`) }}
+      tools={{ today: todayLabel(), notices: storedNotices(notifications.items, `/parent/${schoolId}`),
+        markRead: markNotificationsRead.bind(null, schoolId),
+      }}
     >
       {children}
     </AppShell>

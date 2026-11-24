@@ -1,11 +1,19 @@
 import type { Notice } from "@/components/header-tools";
-import { date, daysUntil } from "./format";
-import type { Onboarding } from "./types";
+import { ago, date, daysUntil } from "./format";
+import type { AppNotification, Onboarding } from "./types";
 
-/**
- * Notifications déduites de l'état du dossier.
- * ponytail: pas de table de notifications côté API ; à créer avec la messagerie (lu / non lu, historique).
- */
+/** Notifications enregistrées (paiements, annonces, absences…) pour la cloche. Sans lien : la page d'accueil. */
+export const storedNotices = (items: AppNotification[], home: string): Notice[] =>
+  items.map((n) => ({
+    id: n.id,
+    title: n.title,
+    detail: n.body ?? undefined,
+    time: ago(n.createdAt),
+    href: n.href ?? home,
+    unread: !n.readAt,
+  }));
+
+/** Alertes déduites de l'état du dossier (tant que la situation dure). */
 export function schoolNotices({ school, requirements }: Onboarding): Notice[] {
   const base = `/ecole/${school.id}`;
   const out: Notice[] = [];

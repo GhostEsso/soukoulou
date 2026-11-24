@@ -643,3 +643,13 @@ export interface Payout {
   processedAt: string | null;
   school?: { name: string };
 }
+
+export interface AppNotification {
+  id: string;
+  kind: string;
+  title: string;
+  body: string | null;
+  href: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
