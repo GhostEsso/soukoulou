@@ -27,6 +27,8 @@ describe('Notifications (e2e)', () => {
 
   let schoolId: string;
   let classroomId: string;
+  let levelId: string;
+  let yearId: string;
   let admin: Record<string, string>;
   let kofi: { studentId: string; auth: Record<string, string> };
   let ama: { studentId: string; auth: Record<string, string> };
@@ -102,9 +104,11 @@ describe('Notifications (e2e)', () => {
         isCurrent: true,
       },
     });
+    yearId = year.id;
     const level = await prisma.level.create({
       data: { schoolId, name: '6e', position: 0 },
     });
+    levelId = level.id;
     classroomId = (
       await prisma.classroom.create({
         data: { schoolId, yearId: year.id, levelId: level.id, name: '6e A' },
@@ -276,5 +280,82 @@ describe('Notifications (e2e)', () => {
       .expect(204);
     expect((await inbox(kofi.auth)).unread).toBe(0);
     expect((await inbox(ama.auth)).unread).toBeGreaterThan(0);
+  });
+
+  it('notes : la famille de chaque élève noté ; rien si la note ne change pas', async () => {
+    const subject = await prisma.subject.create({
+      data: { schoolId, name: 'Mathématiques' },
+    });
+    await prisma.levelSubject.create({
+      data: { levelId, subjectId: subject.id, coefficient: 4 },
+    });
+    const period = await prisma.period.create({
+      data: {
+        yearId,
+        name: '1er trimestre',
+        position: 0,
+        startsOn: new Date('2026-09-01'),
+        endsOn: new Date('2026-12-20'),
+      },
+    });
+    const a = await http
+      .post(`/schools/${schoolId}/assessments`)
+      .set(admin)
+      .send({
+        classroomId,
+        subjectId: subject.id,
+        title: 'Devoir 1',
+        day: '2026-11-20',
+        maxScore: 20,
+      })
+      .expect(201);
+    const grade = (score: number | null) =>
+      http
+        .put(`/schools/${schoolId}/assessments/${a.body.id}/grades`)
+        .set(admin)
+        .send({
+          items: [
+            { studentId: kofi.studentId, score: 14.5 },
+            { studentId: ama.studentId, score },
+          ],
+        })
+        .expect(200);
+    await grade(null);
+    await grade(null); // rien ne change : pas de doublon
+    await grade(12);
+    const kofiGrades = (await inbox(kofi.auth)).items.filter(
+      (n) => n.kind === 'GRADE',
+    );
+    expect(kofiGrades).toHaveLength(1);
+    expect(kofiGrades[0]).toMatchObject({
+      title: 'Note : Kofi — 14.5/20',
+      body: 'Mathématiques · Devoir 1',
+      href: `/parent/${schoolId}/enfants/${kofi.studentId}`,
+    });
+    expect(
+      (await inbox(ama.auth)).items.filter((n) => n.kind === 'GRADE'),
+    ).toHaveLength(1);
+
+    // Bulletin : premier avis du conseil sur la période, pas quand on le corrige.
+    const council = (comment: string) =>
+      http
+        .put(`/schools/${schoolId}/assessments/council`)
+        .set(admin)
+        .send({
+          classroomId,
+          scope: period.id,
+          items: [{ studentId: kofi.studentId, comment }],
+        })
+        .expect(204);
+    await council('Bon trimestre.');
+    await council('Bon trimestre, continuez.');
+    const cards = (await inbox(kofi.auth)).items.filter(
+      (n) => n.kind === 'REPORT_CARD',
+    );
+    expect(cards).toHaveLength(1);
+    expect(cards[0].title).toBe('Bulletin : Kofi (1er trimestre)');
+    expect(
+      (await inbox(ama.auth)).items.some((n) => n.kind === 'REPORT_CARD'),
+    ).toBe(false);
   });
 });

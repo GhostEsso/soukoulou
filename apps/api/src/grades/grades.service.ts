@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.module';
+import { NotificationsService } from '../notifications/notifications.module';
 import { OnboardingService } from '../schools/onboarding.service';
 import { parseDay, isoDay } from '../attendance/rules';
 import type {
@@ -30,6 +31,7 @@ export class GradesService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly onboarding: OnboardingService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   private async assertWrite(schoolId: string) {
@@ -172,9 +174,11 @@ export class GradesService {
       where: { id, classroom: { schoolId } },
       select: {
         id: true,
+        title: true,
         maxScore: true,
         classroomId: true,
         classroom: { select: { yearId: true } },
+        subject: { select: { name: true } },
       },
     });
     if (!a) throw new NotFoundException();
@@ -194,6 +198,14 @@ export class GradesService {
       throw new BadRequestException(
         'Un élève de la liste n’est pas inscrit dans cette classe.',
       );
+    const before = new Map(
+      (
+        await this.prisma.grade.findMany({
+          where: { assessmentId: a.id, studentId: { in: ids } },
+          select: { studentId: true, score: true },
+        })
+      ).map((g) => [g.studentId, Number(g.score)]),
+    );
     await this.prisma.$transaction([
       this.prisma.grade.deleteMany({
         where: {
@@ -226,7 +238,31 @@ export class GradesService {
           }),
         ),
     ]);
+    // Nouvelle note ou note modifiée : la famille est prévenue (pas de doublon si rien ne change).
+    const changed = dto.items.filter(
+      (i) => i.score != null && before.get(i.studentId) !== i.score,
+    );
+    const names = await this.firstNames(changed.map((i) => i.studentId));
+    // ponytail: une requête par élève dans toFamily ; à regrouper si les classes dépassent ~100 élèves
+    await Promise.all(
+      changed.map((i) =>
+        this.notifications.toFamily(schoolId, i.studentId, {
+          kind: 'GRADE',
+          title: `Note : ${names.get(i.studentId)} — ${i.score}/${a.maxScore}`,
+          body: `${a.subject.name} · ${a.title}`,
+        }),
+      ),
+    );
     return this.get(schoolId, a.id);
+  }
+
+  private async firstNames(ids: string[]) {
+    if (!ids.length) return new Map<string, string>();
+    const rows = await this.prisma.student.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, firstName: true },
+    });
+    return new Map(rows.map((r) => [r.id, r.firstName]));
   }
 
   async remove(schoolId: string, id: string) {
@@ -567,13 +603,13 @@ export class GradesService {
     });
     if (!c) throw new NotFoundException('Classe introuvable.');
     const annual = dto.scope === ANNUAL;
-    if (
-      !annual &&
-      !(await this.prisma.period.count({
-        where: { id: dto.scope, yearId: c.yearId },
-      }))
-    )
-      throw new NotFoundException('Période introuvable.');
+    const period = annual
+      ? null
+      : await this.prisma.period.findFirst({
+          where: { id: dto.scope, yearId: c.yearId },
+          select: { name: true },
+        });
+    if (!annual && !period) throw new NotFoundException('Période introuvable.');
     if (!annual && dto.items.some((i) => i.decision))
       throw new BadRequestException(
         'La décision de passage se prend sur le bilan annuel.',
@@ -587,6 +623,14 @@ export class GradesService {
         'Un élève de la liste n’est pas inscrit dans cette classe.',
       );
     const scope = annual ? ANNUAL : dto.scope;
+    const had = new Set(
+      (
+        await this.prisma.councilNote.findMany({
+          where: { yearId: c.yearId, scope, studentId: { in: ids } },
+          select: { studentId: true },
+        })
+      ).map((n) => n.studentId),
+    );
     await this.prisma.$transaction(
       dto.items.map((i) => {
         const key = { studentId: i.studentId, yearId: c.yearId, scope };
@@ -602,6 +646,23 @@ export class GradesService {
               update: data,
             });
       }),
+    );
+    // Premier avis du conseil pour l'élève sur cette période : son bulletin est complet.
+    const fresh = dto.items
+      .filter((i) => (i.comment || i.decision) && !had.has(i.studentId))
+      .map((i) => i.studentId);
+    const names = await this.firstNames(fresh);
+    const label = period ? period.name : 'bilan annuel';
+    await Promise.all(
+      fresh.map((id) =>
+        this.notifications.toFamily(schoolId, id, {
+          kind: 'REPORT_CARD',
+          title: `Bulletin : ${names.get(id)} (${label})`,
+          body: annual
+            ? 'Le bilan annuel et la décision du conseil de classe sont disponibles.'
+            : 'L’avis du conseil de classe est disponible.',
+        }),
+      ),
     );
   }
 }
