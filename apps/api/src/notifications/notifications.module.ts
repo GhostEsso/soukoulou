@@ -19,6 +19,8 @@ export type NotificationKind =
   | 'ANNOUNCEMENT'
   | 'ATTENDANCE'
   | 'DISCIPLINE'
+  | 'GRADE'
+  | 'REPORT_CARD'
   | 'FEE_REMINDER'
   | 'PAYOUT'
   | 'SCHOOL';
